@@ -1,0 +1,49 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-docker-compose
+{
+	"name": "HelloIvy API Dev Container",
+	"dockerComposeFile": [
+		"../docker-compose.yml"
+	],
+	"service": "api",
+	"workspaceFolder": "/code",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python", // Python extension for linting and formatting
+				"ms-python.black-formatter", // Black formatter support
+				"ms-python.isort", // (Optional) isort for import sorting
+				"ms-python.mypy-type-checker", // Mypy type checker
+				"ms-python.vscode-pylance",
+				"usernamehw.errorlens",
+				"ms-toolsai.jupyter",
+				"github.copilot",
+				"ms-python.pylint",
+				"eamodio.gitlens"
+			],
+			"settings": {
+				"editor.defaultFormatter": "ms-python.black-formatter",
+				"python.linting.enabled": true, // Enable linting
+				"python.linting.pylintEnabled": true, // Use Pylint for linting
+				"python.linting.mypyEnabled": true, // Use Mypy for type checking
+				"python.formatting.provider": "black",
+				"editor.formatOnSave": true,
+				"python.defaultInterpreterPath": "/usr/local/bin/python",
+				"extensions.verifySignature": false,
+				"python.languageServer": "Pylance",
+				"python.analysis.indexing": true,
+				"python.analysis.autoImportCompletions": true,
+				"pylint.severity": {
+					"convention": "Information",
+					"error": "Error",
+					"fatal": "Error",
+					"refactor": "Hint",
+					"warning": "Error",
+					"info": "Information"
+				},
+				"chat.mcp.discovery.enabled": true,
+				"chat.agent.enabled": true
+			}
+		}
+	}
+}

@@ -1,0 +1,81 @@
+# cloudbuild.yaml
+steps:
+  # 0) (Optional) Print versions for sanity during debugging
+  - name: gcr.io/cloud-builders/docker
+    id: Versions
+    args: ["version"]
+
+  # 1) Pull the latest image for caching (ignore failures if image doesn't exist)
+  - name: gcr.io/cloud-builders/docker
+    id: Pull
+    entrypoint: bash
+    args:
+      - -c
+      - docker pull $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME:latest || exit 0
+
+  # 2) Build the Docker image with cache
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    args:
+      - build
+      - --file=Dockerfile.prod
+      - --cache-from=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME:latest
+      - --tag=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME:$COMMIT_SHA
+      - --tag=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME:latest
+      - .
+
+  # 3) Push the Docker image
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - --all-tags
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME
+
+  # 4) Run database migrations
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: Migrate
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - execute
+      - migrate-job-1
+      - '--region=$_DEPLOY_REGION'
+      - '--wait'
+
+  # 5) Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: Deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - $_SERVICE_NAME
+      - '--platform=managed'
+      - '--image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME:$COMMIT_SHA'
+      - '--labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID'
+      - '--region=$_DEPLOY_REGION'
+      - '--port=8000'
+      - '--quiet'
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+  # pool:
+  #   name: 'projects/red-provider-468107-a4/locations/asia-south1/workerPools/api-builds'
+
+# substitutions:
+#   _SERVICE_NAME: helloivy-api
+#   _DEPLOY_REGION: asia-south1
+#   _TRIGGER_ID: 35340e4d-6db4-4b3c-aea2-effa17b85852
+#   _AR_HOSTNAME: asia-south1-docker.pkg.dev
+#   _AR_REPOSITORY: cloud-run-source-deploy
+#   _AR_PROJECT_ID: red-provider-468107-a4
+#   _PLATFORM: managed
+
+# tags:
+#   - gcp-cloud-build-deploy-cloud-run
+#   - gcp-cloud-build-deploy-cloud-run-managed
+#   - helloivy-api

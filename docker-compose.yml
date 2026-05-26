@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: my_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: project   # <-- change here
+    volumes:
+      - helloivy_pg_data:/var/lib/postgresql/data
+    ports:
+      - "12322:5432"
+    networks:
+      - common_network
+
+  pgadmin:  
+    image: dpage/pgadmin4
+    container_name: my_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    volumes:
+      - helloivy_pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "12323:80"
+    networks:
+      - common_network
+  api:
+    tty: true
+    build: .
+    command: sh -c "pip install -r requirements.txt && tail -f /dev/null"
+    env_file:
+      - .env
+    volumes:
+      - .:/code
+      - /etc/ssl:/etc/ssl:ro
+    ports:
+      - "12324:8000"
+    networks:
+      - common_network
+networks:
+  common_network:
+    name: common_network
+
+volumes:
+  helloivy_pg_data:
+  helloivy_pgadmin_data:

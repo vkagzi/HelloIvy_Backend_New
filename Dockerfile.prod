@@ -1,0 +1,20 @@
+FROM python:3.13-bullseye
+ENV PYTHONUNBUFFERED=1
+WORKDIR /code
+# Install tzdata and set timezone to Asia/Kolkata (IST)
+RUN apt-get update && apt-get install -y tzdata && \
+    ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
+
+ENV TZ=Asia/Kolkata
+
+# RUN apt-get install build-essential libmariadb-dev-compat libmariadb-dev -y
+COPY requirements.txt /code/
+RUN pip install -r requirements.txt
+
+COPY . /code/
+
+ARG GIT_COMMIT_SHA
+ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
+
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.asgi:application -c gunicorn.conf.py"]

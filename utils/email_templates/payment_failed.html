@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Failed – HelloIvy</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f6f8">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin:40px 0; border-radius:8px; overflow:hidden;">
+
+            <!-- Header / Logo -->
+            <tr>
+              <td align="center" style="padding:24px;">
+                <a href="https://helloivy.ai" target="_blank">
+                  <img src="https://helloivy.ai/ivy.png" alt="HelloIvy Logo" width="70" style="display:block;" />
+                </a>
+              </td>
+            </tr>
+
+            <!-- Failure Banner -->
+            <tr>
+              <td align="center" style="padding:0 32px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" style="background:#fee2e2; padding:16px; border-radius:8px;">
+                      <span style="font-size:32px;">&#10007;</span>
+                      <h2 style="margin:8px 0 0 0; color:#991b1b; font-size:20px;">Payment Failed</h2>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Content -->
+            <tr>
+              <td style="padding:32px; color:#333333;">
+                <p style="font-size:14px; line-height:22px;">
+                  Hi {{user_name}},
+                </p>
+
+                <p style="font-size:14px; line-height:22px;">
+                  Unfortunately, your payment could not be processed. No amount has been charged to your account.
+                </p>
+
+                <!-- Order Details Box -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
+                  <tr>
+                    <td style="background:#f1f3f5; padding:20px; border-radius:6px;">
+                      <h3 style="margin:0 0 12px 0; color:#111111; font-size:16px;">Payment Details</h3>
+
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px; line-height:22px;">
+                        <tr>
+                          <td style="padding:4px 0; color:#555555;">Transaction ID</td>
+                          <td align="right" style="padding:4px 0; color:#111111;">{{transaction_id}}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:4px 0; color:#555555;">Date</td>
+                          <td align="right" style="padding:4px 0; color:#111111;">{{payment_date}}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:4px 0; color:#555555;">Amount</td>
+                          <td align="right" style="padding:4px 0; color:#111111;">{{currency}} {{total_amount}}</td>
+                        </tr>
+                        {{#if failure_reason}}
+                        <tr>
+                          <td style="padding:4px 0; color:#555555;">Reason</td>
+                          <td align="right" style="padding:4px 0; color:#dc2626; font-weight:bold;">{{failure_reason}}</td>
+                        </tr>
+                        {{/if}}
+                      </table>
+
+                      <!-- Divider -->
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0;">
+                        <tr>
+                          <td style="border-top:1px solid #d1d5db;"></td>
+                        </tr>
+                      </table>
+
+                      <!-- Modules Attempted -->
+                      <h4 style="margin:0 0 8px 0; color:#111111; font-size:14px;">Modules</h4>
+                      {{#each modules}}
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px; line-height:22px;">
+                        <tr>
+                          <td style="padding:4px 0; color:#333333;">{{this.name}}</td>
+                        </tr>
+                      </table>
+                      {{/each}}
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Common Reasons -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
+                  <tr>
+                    <td style="background:#fef9c3; padding:16px; border-radius:6px;">
+                      <h4 style="margin:0 0 8px 0; color:#854d0e; font-size:14px;">Common reasons for payment failure:</h4>
+                      <ul style="margin:0; padding-left:20px; font-size:13px; line-height:22px; color:#854d0e;">
+                        <li>Insufficient funds in the account</li>
+                        <li>Card declined by issuing bank</li>
+                        <li>Incorrect card details or expired card</li>
+                        <li>Transaction timed out</li>
+                      </ul>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="font-size:14px; line-height:22px;">
+                  You can retry the payment from your dashboard. If the issue persists, please try using a different payment method.
+                </p>
+
+                <!-- CTA Button -->
+                <div style="text-align:center; margin:24px 0;">
+                  <a href="https://app.helloivy.ai"
+                     style="background-color:#4F46E5; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:6px; font-size:14px; display:inline-block;">
+                    Retry Payment
+                  </a>
+                </div>
+
+                <p style="font-size:14px; line-height:22px;">
+                  If you were charged despite this failure, please contact us at
+                  <a href="mailto:support@helloivy.ai" style="color:#4F46E5; text-decoration:none;">support@helloivy.ai</a>
+                  and we'll resolve it immediately.
+                </p>
+
+                <p style="font-size:14px; line-height:22px;">
+                  Warmly,<br />
+                  <strong>Team HelloIvy.ai</strong>
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:16px; text-align:center; font-size:12px; color:#888888;">
+                <p style="margin:0;">
+                  &copy; 2026 HelloIvy &bull;
+                  <a href="https://helloivy.ai" style="color:#4F46E5; text-decoration:none;">
+                    helloivy.ai
+                  </a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

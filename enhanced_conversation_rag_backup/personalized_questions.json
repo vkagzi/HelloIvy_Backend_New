@@ -1,0 +1,22 @@
+{
+  "student_profile": {
+    "name": "Student",
+    "academic_background": "",
+    "major": "",
+    "gpa": "",
+    "citizenship": "",
+    "location": "",
+    "work_experience": [],
+    "achievements": [],
+    "extracurriculars": []
+  },
+  "essay_topic": "What is your impression of Duke as a university and community, and why do you believe it is a good match for your goals, values, and interests?",
+  "personalized_questions": [
+    "Given your background in , what specific Duke programs or research opportunities align with your academic interests?",
+    "How does your experience with your activities relate to what you hope to achieve at Duke?",
+    "What aspects of Duke's community culture resonate with your values, considering your background from ?",
+    "How do your career experiences in various fields inform your future goals?",
+    "What specific resources at this institution would help you achieve your post-graduation objectives?"
+  ],
+  "instructions": "Based on Student's profile, use these questions to guide your essay response. Each question is tailored to help you connect your personal experiences to the essay topic."
+}
