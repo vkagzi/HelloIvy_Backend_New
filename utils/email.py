@@ -24,12 +24,19 @@ def send_otp_email(email: str, otp_code: str) -> None:
     to = email
     subject = "Your HelloIvy OTP Code"
     print(f"[EMAIL] Sending OTP to {to}: {otp_code}")
-    template_id = "d-277b21695c4e42ca90742bb94d7fff79"
-    dynamic_template_data = {
-        "otp_code": otp_code,
-    }
-
-    send_email(to, subject, template_id=template_id, dynamic_template_data=dynamic_template_data)
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #6c3be4;">Your OTP Code</h2>
+      <p>Use the code below to verify your email address:</p>
+      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #6c3be4; padding: 16px 0;">
+        {otp_code}
+      </div>
+      <p style="color: #666; font-size: 13px;">This code expires in 10 minutes. Do not share it with anyone.</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="color: #999; font-size: 12px;">HelloIvy &mdash; AI-Powered Career Guidance</p>
+    </div>
+    """
+    send_email(to, subject, html=html)
 
 
 def send_temp_password_email(email: str, temp_password: str, student_name: str = "") -> None:
