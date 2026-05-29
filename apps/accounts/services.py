@@ -1,6 +1,9 @@
+import logging
 from utils.email import send_otp_email
 from .dtos import UserDTO
 from .models import EmailOTP, User
+
+logger = logging.getLogger(__name__)
 
 
 class AccountsService:
@@ -23,7 +26,10 @@ class AccountsService:
             # Create new OTP
             otp = EmailOTP(email=email, code=EmailOTP.generate_otp())
             otp.save()
-            send_otp_email(email, otp.code)
+            try:
+                send_otp_email(email, str(otp.code))
+            except Exception as email_err:
+                logger.warning(f"OTP email failed — check terminal for OTP code: {email_err}")
 
             return True, "User created successfully"
         except Exception as e:
