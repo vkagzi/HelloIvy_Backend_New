@@ -73,14 +73,14 @@ def _slim_webhook_payload(payload: dict) -> dict:
 # Module pricing — resolved from the ModulePricing table.
 # Fallback used only when no DB row exists (e.g. fresh install).
 # ---------------------------------------------------------------------------
-DEFAULT_MODULE_PRICE = 0  # TEST ONLY — set back to 999 before going live
+DEFAULT_MODULE_PRICE = 999
 PAYMENT_CURRENCY = "INR"
 
-# Fallback prices — TEST ONLY (all zeroed for HDFC ₹0 test, revert before going live)
+# Fallback prices matching STATIC_MODULES in the frontend
 FALLBACK_PRICES = {
-    "college_selector": 0,
-    "career_discovery": 0,
-    "domain_discovery": 0,
+    "college_selector": 4500,
+    "career_discovery": 999,
+    "domain_discovery": 999,
 }
 
 
