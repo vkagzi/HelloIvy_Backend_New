@@ -4,7 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
@@ -73,14 +73,14 @@ def _slim_webhook_payload(payload: dict) -> dict:
 # Module pricing — resolved from the ModulePricing table.
 # Fallback used only when no DB row exists (e.g. fresh install).
 # ---------------------------------------------------------------------------
-DEFAULT_MODULE_PRICE = 999
+DEFAULT_MODULE_PRICE = 0  # TEST ONLY — set back to 999 before going live
 PAYMENT_CURRENCY = "INR"
 
-# Fallback prices matching STATIC_MODULES in the frontend
+# Fallback prices — TEST ONLY (all zeroed for HDFC ₹0 test, revert before going live)
 FALLBACK_PRICES = {
-    "college_selector": 4500,
-    "career_discovery": 999,
-    "domain_discovery": 999,
+    "college_selector": 0,
+    "career_discovery": 0,
+    "domain_discovery": 0,
 }
 
 
@@ -297,6 +297,72 @@ def _build_module_list(payment) -> list[dict]:
     return items
 
 
+def _generate_payment_invoice(payment) -> bytes | None:
+    """Prepare InvoiceData and generate PDF bytes for a payment."""
+    logger.info(f"[Invoice] Generating PDF for payment_id={payment.id}")
+    
+    try:
+        from utils.invoice_pdf import InvoiceData, InvoiceLineItem, generate_invoice_pdf
+        
+        # Resolve data (common for both B2C and B2B where possible)
+        if isinstance(payment, UserPayment):
+            user = payment.user
+            email = user.email
+            user_name = user.first_name or user.email
+            first_name = user.first_name or ""
+            last_name = user.last_name or ""
+        else:
+            school = payment.school
+            email = school.contact_email
+            user_name = school.name
+            first_name = ""
+            last_name = ""
+
+        transaction_id = payment.gateway_transaction_id or str(payment.id)
+        payment_date = payment.updated_at.strftime("%d %b %Y") if hasattr(payment, "updated_at") else timezone.now().strftime("%d %b %Y")
+        currency = payment.currency or "INR"
+        
+        pricing = (payment.metadata or {}).get("pricing", {})
+        billing_state = (payment.metadata or {}).get("billing_state", "")
+        tax_label = "CGST (9%) + SGST (9%)" if billing_state == "maharashtra" else "IGST (18%)"
+        address = (payment.metadata or {}).get("address", "")
+        gst_number = (payment.metadata or {}).get("gst_number", "")
+
+        line_items = []
+        for entry in payment.modules_purchased:
+            line_items.append(InvoiceLineItem(
+                module=entry["module"],
+                quantity=entry.get("quantity", 1),
+                price=entry.get("price", DEFAULT_MODULE_PRICE),
+            ))
+
+        invoice_data = InvoiceData(
+            order_id=payment.id,
+            order_date=payment_date,
+            billing_name=user_name,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            address=address,
+            gst_number=gst_number,
+            line_items=line_items,
+            subtotal=pricing.get("subtotal", payment.amount),
+            discount=pricing.get("discount", 0),
+            discount_code=pricing.get("coupon_code"),
+            tax=pricing.get("tax", 0),
+            tax_label=tax_label,
+            total=payment.amount,
+            currency=currency,
+            transaction_id=transaction_id,
+            status=payment.status.capitalize(),
+            payment_mode="HDFC Gateway",
+        )
+        return generate_invoice_pdf(invoice_data)
+    except Exception:
+        logger.exception(f"[Invoice] Failed to generate invoice PDF for payment {payment.id}")
+        return None
+
+
 def _send_payment_status_email(payment, status: str, gateway_status: str | None = None) -> None:
     """Send payment success or failure email.
 
@@ -338,52 +404,7 @@ def _send_payment_status_email(payment, status: str, gateway_status: str | None 
             logger.info(f"[PaymentEmail] Sending SUCCESS email to {email}, pricing={pricing}, billing_state={billing_state}")
 
             # Generate invoice PDF attachment
-            invoice_pdf = None
-            try:
-                from utils.invoice_pdf import InvoiceData, InvoiceLineItem, generate_invoice_pdf
-
-                first_name = ""
-                last_name = ""
-                if isinstance(payment, UserPayment):
-                    first_name = payment.user.first_name or ""
-                    last_name = payment.user.last_name or ""
-
-                address = (payment.metadata or {}).get("address", "")
-                gst_number = (payment.metadata or {}).get("gst_number", "")
-
-                line_items = []
-                for entry in payment.modules_purchased:
-                    line_items.append(InvoiceLineItem(
-                        module=entry["module"],
-                        quantity=entry.get("quantity", 1),
-                        price=entry.get("price", DEFAULT_MODULE_PRICE),
-                    ))
-
-                invoice_data = InvoiceData(
-                    order_id=payment.id,
-                    order_date=payment_date,
-                    billing_name=user_name,
-                    first_name=first_name,
-                    last_name=last_name,
-                    email=email,
-                    address=address,
-                    gst_number=gst_number,
-                    line_items=line_items,
-                    subtotal=pricing.get("subtotal", payment.amount),
-                    discount=pricing.get("discount", 0),
-                    discount_code=pricing.get("coupon_code"),
-                    tax=pricing.get("tax", 0),
-                    tax_label=tax_label,
-                    total=payment.amount,
-                    currency=currency,
-                    transaction_id=transaction_id,
-                    status="Paid",
-                    payment_mode="HDFC Gateway",
-                )
-                invoice_pdf = generate_invoice_pdf(invoice_data)
-                logger.info(f"[PaymentEmail] Invoice PDF generated: {len(invoice_pdf)} bytes")
-            except Exception:
-                logger.exception(f"[PaymentEmail] Failed to generate invoice PDF for payment {payment.id}; sending email without attachment")
+            invoice_pdf = _generate_payment_invoice(payment) if status == "completed" else None
 
             send_payment_success_email(
                 email=email,
@@ -493,6 +514,31 @@ class StudentCheckoutView(APIView):
         )
         payment.set_status(UserPayment.Status.PENDING)
         payment.save()
+
+        # If total is 0 (e.g. 100% discount), bypass gateway and provision immediately
+        if total == 0:
+            payment.set_status(UserPayment.Status.COMPLETED)
+            payment.metadata = {
+                "pricing": order,
+                "billing_state": billing_state,
+                "first_name": first_name or user.first_name,
+                "last_name": last_name or user.last_name,
+                "email": email or user.email,
+                "phone": phone,
+                "address": address,
+                "gst_number": gst_number,
+                "is_zero_cost": True,
+            }
+            payment.save()
+            _provision_user_subscriptions(payment)
+            _send_payment_status_email(payment, "completed")
+            
+            return Response({
+                "payment_id": payment.id,
+                "is_zero_cost": True,
+                "status": "completed",
+                "message": "Checkout successful (100% discount applied)"
+            }, status=201)
 
         # Initialize HDFC payment order
         frontend_base = _get_frontend_base_url()
@@ -954,8 +1000,24 @@ class SchoolCheckoutView(UserDTOView):
         # Generate a unique order_id per attempt so retries work.
         hdfc_order_id = f"{payment.id}_{uuid.uuid4().hex[:8]}"
 
-        # HDFC may strip query params, so embed context in the URL path.
-        return_url = f"{frontend_base}/api/payment/return/{hdfc_order_id}/school"
+        # If total is 0, bypass gateway and provision immediately
+        if total == 0:
+            payment.set_status(SchoolPayment.Status.COMPLETED)
+            payment.metadata = {
+                **payment.metadata,
+                "pricing": order,
+                "is_zero_cost": True,
+            }
+            payment.save()
+            _provision_school_subscriptions_with_students(payment)
+            _send_payment_status_email(payment, "completed")
+
+            return Response({
+                "payment_id": payment.id,
+                "is_zero_cost": True,
+                "status": "completed",
+                "message": "Checkout successful (100% discount applied)"
+            }, status=201)
 
         try:
             gateway = get_payment_gateway()
@@ -1651,6 +1713,49 @@ class GradeAutoAssignView(UserDTOView):
             })
 
         return Response({"rules": created, "count": len(created)}, status=201)
+
+
+class StudentInvoiceDownloadView(UserDTOView):
+    """Serve invoice PDF for a student payment."""
+
+    def get(self, request: Request, payment_id: int) -> HttpResponse | Response:
+        try:
+            payment = UserPayment.objects.get(id=payment_id, user_id=self.user_dto.id)
+        except UserPayment.DoesNotExist:
+            return Response({"error": "Payment not found"}, status=404)
+
+
+        pdf_bytes = _generate_payment_invoice(payment)
+        if not pdf_bytes:
+            return Response({"error": "Failed to generate invoice PDF"}, status=500)
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="HelloIvy_Invoice_{payment_id}.pdf"'
+        return response
+
+
+class SchoolInvoiceDownloadView(UserDTOView):
+    """Serve invoice PDF for a school payment."""
+
+    def _require_school_admin(self) -> None:
+        if self.user_dto.role not in (UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN) or self.user_dto.school_id is None:
+            raise PermissionDenied(detail="Only school admins can use this endpoint")
+
+    def get(self, request: Request, payment_id: int) -> HttpResponse | Response:
+        self._require_school_admin()
+        try:
+            payment = SchoolPayment.objects.get(id=payment_id, school_id=self.user_dto.school_id)
+        except SchoolPayment.DoesNotExist:
+            return Response({"error": "Payment not found"}, status=404)
+
+
+        pdf_bytes = _generate_payment_invoice(payment)
+        if not pdf_bytes:
+            return Response({"error": "Failed to generate invoice PDF"}, status=500)
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="HelloIvy_School_Invoice_{payment_id}.pdf"'
+        return response
 
 
 class GradeAutoAssignDeleteView(UserDTOView):

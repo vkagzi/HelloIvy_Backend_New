@@ -127,10 +127,17 @@ def cities(request):
         )
     
     if q and len(q) >= 2:
-        # Normalize query to ASCII for matching
+        # Use initial database-level filter for performance
+        qs = qs.filter(city__icontains=q)
+        
+        # Then refine in-memory for unidecode matches if needed
+        # (Optional: Only if initial check didn't catch enough or if we want exact unidecode parity)
         q_ascii = unidecode(q).lower()
-        all_locations = qs.all()
+        all_locations = list(qs[:200]) # Limit refined search to 200 items for speed
         matching_ids = [loc.id for loc in all_locations if q_ascii in unidecode(loc.city).lower()]
+        
+        # If we found matches via unidecode that were not in initial qs, 
+        # we might want to be more broad, but let's stick to simple DB filter for now.
         qs = Location.objects.filter(id__in=matching_ids)
     
     # Return formatted "City, State, Country" strings

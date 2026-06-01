@@ -311,43 +311,82 @@ class MyModulesView(UserDTOView):
     @extend_schema(request=None, responses={200: "Active modules for the user."})
     def get(self, request: Request) -> Response:
         from django.utils import timezone
-        from .models import UserModuleSubscription
+        from .models import UserModuleSubscription, SchoolModuleSubscription, ModuleName, CustomModule, ModulePricing
 
         # Superadmin and operationadmin bypass subscription checks
         if self.user_dto.role in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN):
-            from .models import CustomModule, ModulePricing
             global_prices = {
                 mp.module_name for mp in ModulePricing.objects.filter(
                     school__isnull=True, user__isnull=True, is_active=True
                 )
             }
-            all_modules = [m.value for m in ModuleName] + [
+            all_module_names = [m.value for m in ModuleName] + [
                 cm.value for cm in CustomModule.objects.all() if cm.value in global_prices
             ]
-            return Response({"modules": all_modules}, status=200)
+            
+            # For admins, give a fake far-future expiry date
+            fake_expiry = (timezone.now() + timezone.timedelta(days=36500)).date().isoformat()
+            module_details = [
+                {"module_name": name, "expiry_date": fake_expiry, "is_expired": False}
+                for name in all_module_names
+            ]
+            
+            return Response({
+                "modules": all_module_names,
+                "module_details": module_details
+            }, status=200)
 
         today = timezone.now().date()
-        module_set: set[str] = set()
+        recent_cutoff = today - timezone.timedelta(days=30)
+        
+        # We'll use a dict to keep the "best" subscription for each module
+        # Priority: Active (latest expiry) > Expired (latest expiry)
+        module_info: dict[str, dict] = {}
 
-        # School-level subscriptions (applies to both students and school admins)
+        def update_module_info(name, expiry, is_active):
+            is_expired = expiry < today
+            if name not in module_info:
+                module_info[name] = {
+                    "module_name": name,
+                    "expiry_date": expiry.isoformat(),
+                    "is_expired": is_expired
+                }
+            else:
+                existing = module_info[name]
+                # If existing is expired and new one is not, or new one has later expiry
+                if (existing["is_expired"] and not is_expired) or (expiry.isoformat() > existing["expiry_date"]):
+                     module_info[name] = {
+                        "module_name": name,
+                        "expiry_date": expiry.isoformat(),
+                        "is_expired": is_expired
+                    }
+
+        # School-level subscriptions
         if self.user_dto.school_id:
-            school_modules = SchoolModuleSubscription.objects.filter(
+            school_subs = SchoolModuleSubscription.objects.filter(
                 school_id=self.user_dto.school_id,
                 is_active=True,
-                expiry_date__gte=today,
-            ).values_list("module_name", flat=True)
-            module_set.update(school_modules)
+                expiry_date__gte=recent_cutoff,
+            )
+            for sub in school_subs:
+                update_module_info(sub.module_name, sub.expiry_date, sub.is_active)
 
-        # Individual user-level subscriptions (students only)
+        # Individual user-level subscriptions
         if self.user_dto.role == UserRole.STUDENT:
-            user_modules = UserModuleSubscription.objects.filter(
+            user_subs = UserModuleSubscription.objects.filter(
                 user_id=self.user_dto.id,
                 is_active=True,
-                expiry_date__gte=today,
-            ).values_list("module_name", flat=True)
-            module_set.update(user_modules)
+                expiry_date__gte=recent_cutoff,
+            )
+            for sub in user_subs:
+                update_module_info(sub.module_name, sub.expiry_date, sub.is_active)
 
-        return Response({"modules": list(module_set)}, status=200)
+        active_modules = [name for name, info in module_info.items() if not info["is_expired"]]
+        
+        return Response({
+            "modules": active_modules,
+            "module_details": list(module_info.values())
+        }, status=200)
 
 
 class CustomModuleListCreateView(APIView):
