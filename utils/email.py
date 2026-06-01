@@ -25,15 +25,19 @@ def send_otp_email(email: str, otp_code: str) -> None:
     subject = "Your HelloIvy OTP Code"
     print(f"[EMAIL] Sending OTP to {to}: {otp_code}")
     html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #6c3be4;">Your OTP Code</h2>
-      <p>Use the code below to verify your email address:</p>
-      <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #6c3be4; padding: 16px 0;">
-        {otp_code}
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 32px; background-color: #ffffff;">
+      <div style="text-align: center; margin-bottom: 28px;">
+        <span style="font-size: 26px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #6c3be4;">ivy</span></span>
       </div>
-      <p style="color: #666; font-size: 13px;">This code expires in 10 minutes. Do not share it with anyone.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="color: #999; font-size: 12px;">HelloIvy &mdash; AI-Powered Career Guidance</p>
+      <h2 style="color: #1a1a2e; font-size: 20px; font-weight: 700; margin-bottom: 8px;">Your OTP Code &#128274;</h2>
+      <p style="color: #555555; font-size: 15px; margin-bottom: 24px;">Use the following one-time password (OTP) to complete your verification:</p>
+      <div style="background: linear-gradient(135deg, #6c3be4, #4f46e5); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+        <span style="font-size: 42px; font-weight: 800; letter-spacing: 14px; color: #ffffff;">{otp_code}</span>
+      </div>
+      <p style="color: #555555; font-size: 14px; margin-bottom: 8px;">This code is valid for <strong>10 minutes</strong>. For your security, do not share this code with anyone.</p>
+      <p style="color: #888888; font-size: 13px;">If you didn&rsquo;t request this code, you can safely ignore this email.</p>
+      <hr style="border: none; border-top: 1px solid #eeeeee; margin: 28px 0;" />
+      <p style="color: #aaaaaa; font-size: 12px; text-align: center;">HelloIvy &mdash; AI-Powered Career Guidance</p>
     </div>
     """
     send_email(to, subject, html=html)
