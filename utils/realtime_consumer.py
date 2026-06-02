@@ -84,6 +84,9 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         # Determine provider
         self._use_openai_direct = bool(self.openai_api_key)
         
+        # Selected accent preference
+        self.accent = None
+        
         # Silent reconnection tracking
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 2
@@ -339,11 +342,36 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         "as if the conversation never paused or changed context.]"
     )
 
+    def get_accent_directive(self) -> str:
+        """Return the appropriate system instruction directive for the requested accent."""
+        accent = getattr(self, 'accent', None)
+        if accent == 'indian':
+            return (
+                "\n\n[Accent Directive: You are an Indian counselor. You MUST speak with a distinct, prominent, and authentic Indian English accent. "
+                "Do NOT sound American or British. Differentiate your speech using the following Indian English phonetic patterns:\n"
+                "1. Rhythm: Use a syllable-timed rhythm (where each syllable has equal duration), which is characteristic of Indian English, rather than stress-timed rhythm.\n"
+                "2. Vowels: Pronounce vowels like in 'late' or 'goat' as pure monophthongs (pure 'ay' and 'oh' sounds) rather than diphthongs.\n"
+                "3. Consonants: Pronounce 't' and 'd' sounds with a slight retroflex (tongue curled back slightly towards the roof of the mouth, as in Indian languages), and ensure 'th' sounds (like in 'this' or 'think') are pronounced as clear plosives (closer to 'd' or 't').\n"
+                "4. Intonation: Adopt a warm, friendly, and authentic Indian regional intonation, cadence, and cadence patterns.\n"
+                "Make sure your accent is clearly and distinctly Indian from your very first word to your last.]"
+            )
+        elif accent == 'british':
+            return (
+                "\n\n[Accent Directive: You are a British counselor. You MUST speak with a clear, polished, and distinct British English accent (Received Pronunciation). "
+                "Maintain British pronunciation, speech rhythms, intonation, and phrasing throughout the entire conversation.]"
+            )
+        elif accent == 'american':
+            return (
+                "\n\n[Accent Directive: You are an American counselor. You MUST speak with a clear, natural, and distinct standard American English accent. "
+                "Maintain standard American pronunciation and intonation throughout the entire conversation.]"
+            )
+        return ""
+
     async def configure_openai_session(self):
         """Send initial session configuration to OpenAI with custom instructions"""
         try:
-            logger.info(f"⚙️ Configuring session for {self.session_id}")
-            instructions = await self.get_instructions()
+            logger.info(f"⚙️ Configuring session for {self.session_id} (accent: {getattr(self, 'accent', 'None')})")
+            instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
             instructions += self.VOICE_STYLE_DIRECTIVE
             logger.info(f"📝 Got instructions (length: {len(instructions)} chars)")
             
