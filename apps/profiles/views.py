@@ -233,9 +233,9 @@ class ResumeParserView(UserDTOView):
                         degree
                         major
                         cgpa
-                        start_year
-                        end_year
-                        current_year
+                        start_year (JSON string, extract only the year e.g. "2023")
+                        end_year (JSON string, extract only the year e.g. "2024")
+                        current_year (JSON string, extract only the year e.g. "2026")
                         skills
                         projects
                         experience
@@ -253,8 +253,31 @@ class ResumeParserView(UserDTOView):
             parsed = {}
 
         return Response({
-            "personal": parsed
+            "personal": sanitize_years(parsed)
         })
+
+def sanitize_years(data):
+    """Recursively sanitize year fields to ensure they only contain YYYY."""
+    year_fields = {'yearOfCompletion', 'startYear', 'endYear', 'year', 'start_year', 'end_year', 'current_year'}
+    
+    if isinstance(data, dict):
+        new_data = {}
+        for k, v in data.items():
+            if k in year_fields and isinstance(v, str) and v:
+                # Extract the first 4 digits found in the string
+                import re
+                match = re.search(r'\b(19|20)\d{2}\b', v)
+                if match:
+                    new_data[k] = match.group(0)
+                else:
+                    new_data[k] = v
+            else:
+                new_data[k] = sanitize_years(v)
+        return new_data
+    elif isinstance(data, list):
+        return [sanitize_years(item) for item in data]
+    else:
+        return data
 
 class TranscriptParserView(UserDTOView):
     parser_classes = [MultiPartParser]
@@ -364,7 +387,9 @@ STRICT RULES:
    - city: Extract the city name.
    - zipcode: Extract the 6-digit pin code or zip code.
 3. INSTITUTION NAME: Look for the specific college name. 
-4. DATES: Use YYYY-MM-DD format. If a date says "Present" or "Current", use "2026-05-09".
+4. DATES vs YEARS: 
+    - For FULL DATES (dob, testDate, startDate, endDate): Use YYYY-MM-DD format. If a date says "Present" or "Current", use "2026-05-09".
+    - For YEARS ONLY (yearOfCompletion, startYear, endYear, year): Use exactly 4 digits (e.g. "2024"). DO NOT include month or day.
 5. ACADEMIC LEVEL: Use exactly one of: "High School (8th–12th grade)", "College/Undergraduate", "Postgraduate", "Working Professional". 
    - CRITICAL: If the document contains any Full-time professional work experience (excluding internships), the ACADEMIC LEVEL must be "Working Professional".
    - If the person has completed a Bachelor's degree and is currently in a Master's or has professional experience, it must NOT be "College/Undergraduate".
@@ -406,9 +431,9 @@ JSON STRUCTURE:
   "personalDetails": {{ "firstName": "", "lastName": "", "email": "", "countryCode": "", "phoneNumber": "", "dob": "YYYY-MM-DD", "gender": "", "citizenShip": "", "addressline": "", "city": "", "zipcode": "", "mothersProfession": "", "fathersProfession": "" }},
   "educational": [
     {{
-       "academicLevel": "High School (8th\u201312th grade)", "gradeLevel": 12, "institutionName": "", "city": "", "yearOfCompletion": "YYYY-MM-DD",
+       "academicLevel": "High School (8th\u201312th grade)", "gradeLevel": 12, "institutionName": "", "city": "", "yearOfCompletion": "YYYY",
        "overallPercentage": "", "maximumPossibleGPA": "",
-       "degree": "", "major": "", "startYear": "", "endYear": "",
+       "degree": "", "major": "", "startYear": "YYYY", "endYear": "YYYY",
        "board": "",
        "subjects": [
           {{ "subject": "", "level": "", "yourTotalScore": "", "highestTotalScore": "100" }}
@@ -416,10 +441,10 @@ JSON STRUCTURE:
     }}
   ],
   "courses": [
-     {{ "courseType": "", "description": "", "year": "", "awards": "", "duration": "", "location": "" }}
+     {{ "courseType": "", "description": "", "year": "YYYY", "awards": "", "duration": "", "location": "" }}
   ],
   "awards": [
-     {{ "nameOfHonorReceived": "", "description": "", "levelOfCompetitiveness": "", "numberOfParticipants": "", "year": "" }}
+     {{ "nameOfHonorReceived": "", "description": "", "levelOfCompetitiveness": "", "numberOfParticipants": "", "year": "YYYY" }}
   ],
   "testScores": [ 
     {{ 
@@ -485,6 +510,8 @@ Document content:
                 print(f"Failed to save AI response to scratch: {save_err}")
                 
             parsed = json.loads(content)
+            # Sanitize years before returning
+            parsed = sanitize_years(parsed)
             print(f"Successfully parsed AI response with keys: {list(parsed.keys())}")
         except Exception as e:
             import traceback

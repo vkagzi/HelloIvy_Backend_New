@@ -11,6 +11,7 @@ from datetime import timedelta
 import logging
 import uuid
 import urllib.parse
+from decimal import Decimal
 
 from collections import Counter
 
@@ -1782,6 +1783,128 @@ class GradeAutoAssignDeleteView(UserDTOView):
 
 
 # ---------------------------------------------------------------------------
+# Payment retry — allow resuming a pending payment session
+# ---------------------------------------------------------------------------
+
+class PaymentRetryView(UserDTOView):
+    """
+    Re-initialize a pending payment session with HDFC.
+    
+    Used when a user returns to their dashboard and wants to complete
+     a payment that was previously started but not finished.
+    """
+
+    def post(self, request: Request, payment_id: int, **kwargs) -> Response:
+        payment_type = kwargs.get("type", "student")
+        
+        logger.info(f"[PaymentRetry] Received request for payment_id={payment_id}, type={payment_type}, user={self.user_dto.id}")
+
+        if payment_type == "school":
+            if self.user_dto.role not in (UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN) or self.user_dto.school_id is None:
+                raise PermissionDenied(detail="Only school admins can retry school payments")
+            try:
+                payment = SchoolPayment.objects.get(id=payment_id, school_id=self.user_dto.school_id)
+            except SchoolPayment.DoesNotExist:
+                return Response({"error": "Payment not found"}, status=404)
+        else:
+            try:
+                payment = UserPayment.objects.get(id=payment_id, user_id=self.user_dto.id)
+            except UserPayment.DoesNotExist:
+                logger.error(f"[PaymentRetry] UserPayment {payment_id} not found for user {self.user_dto.id}")
+                return Response({"error": "Payment not found"}, status=404)
+
+        if payment.status != payment.Status.PENDING:
+            logger.warning(f"[PaymentRetry] Attempted to retry non-pending payment {payment.id} (status: {payment.status})")
+            return Response({
+                "error": f"Only pending payments can be retried. Current status: {payment.status}",
+                "status": payment.status
+            }, status=400)
+
+        # Re-initialize HDFC payment order
+        frontend_base = _get_frontend_base_url()
+        
+        # Determine gateway type and details
+        type_str = "student" if payment_type == "student" else "school"
+        
+        # HDFC rejects a new session with a previously-used order_id.
+        # Generate a unique order_id per attempt so retries work.
+        hdfc_order_id = f"{payment.id}_{uuid.uuid4().hex[:8]}"
+        return_url = f"{frontend_base}/api/payment/return/{hdfc_order_id}/{type_str}"
+
+        try:
+            gateway = get_payment_gateway()
+            logger.info(f"[PaymentRetry] Resolved gateway: {gateway}")
+            
+            # Extract metadata for the gateway
+            # If metadata was lost or empty, the gateway order might fail,
+            # but we try to preserve what was there.
+            m = payment.metadata or {}
+            cust = m.get("customer") or {} # Some versions might store customer nested
+            
+            first_name = cust.get("first_name") or m.get("first_name", "")
+            last_name = cust.get("last_name") or m.get("last_name", "")
+            email = cust.get("email") or m.get("email", "")
+            phone = cust.get("phone") or m.get("phone", "")
+            address = cust.get("address") or m.get("address", "")
+            state = cust.get("state") or m.get("billing_state", "")
+
+            gateway_metadata = {
+                "payment_id": payment.id,
+                "order_id": hdfc_order_id,
+                "type": type_str,
+                "first_name": first_name or self.user_dto.first_name,
+                "last_name": last_name or self.user_dto.last_name,
+                "email": email or self.user_dto.email,
+                "phone": phone,
+                "address": address,
+                "state": state,
+                "return_url": return_url,
+            }
+            
+            logger.info(f"[PaymentRetry] Re-initializing HDFC session for payment {payment.id} with new order_id {hdfc_order_id}")
+            
+            gateway_response = gateway.create_payment_order(
+                amount=Decimal(str(payment.amount)),
+                currency=payment.currency or PAYMENT_CURRENCY,
+                metadata=gateway_metadata
+            )
+            
+            # Update payment record with new gateway details
+            payment.order_id = hdfc_order_id
+            # Gateway returns 'transaction_id', not 'gateway_transaction_id'
+            payment.gateway_transaction_id = gateway_response.get("transaction_id", "") or gateway_response.get("gateway_transaction_id", "")
+            payment.save()
+
+            payment_links = gateway_response.get("payment_links", {})
+            logger.info(f"[PaymentRetry] Raw gateway_response keys: {list(gateway_response.keys())}")
+            logger.info(f"[PaymentRetry] Payment links: {payment_links}")
+            
+            # Try web link first, then iframe, then top-level web key
+            payment_url = (
+                payment_links.get("web")
+                or payment_links.get("iframe")
+                or gateway_response.get("web")
+            )
+            
+            if not payment_url:
+                 logger.error(f"[PaymentRetry] Gateway did not return a payment URL for payment {payment.id}")
+                 return Response({"error": "Gateway did not return a payment URL"}, status=500)
+
+            logger.info(f"[PaymentRetry] Successfully re-initialized payment {payment.id}. New txn ID: {payment.gateway_transaction_id}")
+
+            return Response({
+                "payment_id": payment.id,
+                "payment_url": payment_url,
+                "gateway_transaction_id": payment.gateway_transaction_id,
+                "order_id": hdfc_order_id
+            })
+
+        except Exception as e:
+            logger.exception(f"[PaymentRetry] Failed to re-initialize HDFC session for payment {payment.id}: {e}")
+            return Response({"error": "Failed to re-initialize payment session. Please try again later."}, status=500)
+
+
+# ---------------------------------------------------------------------------
 # Payment status check — called by frontend after HDFC redirect
 # ---------------------------------------------------------------------------
 
@@ -2191,10 +2314,20 @@ class PaymentReturnVerifyView(APIView):
         status_cls = payment.Status
 
         # Already terminal — return immediately
-        if payment.status == status_cls.COMPLETED:
-            return Response({"payment_id": payment.id, "status": "completed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
-        if payment.status == status_cls.FAILED:
-            return Response({"payment_id": payment.id, "status": "failed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
+        if payment.status in (status_cls.COMPLETED, status_cls.FAILED):
+            res_data = {
+                "payment_id": payment.id,
+                "status": "completed" if payment.status == status_cls.COMPLETED else "failed",
+                "type": payment_type,
+                "amount": payment.amount,
+                "currency": payment.currency or "INR",
+            }
+            # Include cart details for failure flow to allow immediate retry
+            if payment.status == status_cls.FAILED:
+                res_data["modules"] = ",".join(m["module"] for m in payment.modules_purchased)
+                res_data["billing_state"] = (payment.metadata or {}).get("billing_state", "")
+
+            return Response(res_data)
 
         # Verify with HDFC
         stored_order_id = payment.order_id or str(payment.id)
@@ -2225,7 +2358,13 @@ class PaymentReturnVerifyView(APIView):
                 _provision_school_subscriptions_with_students(payment)
             _send_payment_status_email(payment, "completed")
             logger.info(f"[PaymentReturn] Payment {payment.id} completed via return flow")
-            return Response({"payment_id": payment.id, "status": "completed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
+            return Response({
+                "payment_id": payment.id,
+                "status": "completed",
+                "type": payment_type,
+                "amount": payment.amount,
+                "currency": payment.currency or "INR"
+            })
 
         # User is already back from the gateway — any non-success status
         # means the payment will not complete.  Mark it failed so the
@@ -2238,7 +2377,15 @@ class PaymentReturnVerifyView(APIView):
         payment.metadata["verification"] = _slim_gateway_verification(result.get("gateway_response", {}))
         payment.save()
         _send_payment_status_email(payment, "failed", gateway_status=hdfc_status)
-        return Response({"payment_id": payment.id, "status": "failed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
+        return Response({
+            "payment_id": payment.id,
+            "status": "failed",
+            "type": payment_type,
+            "amount": payment.amount,
+            "currency": payment.currency or "INR",
+            "modules": ",".join(m["module"] for m in payment.modules_purchased),
+            "billing_state": (payment.metadata or {}).get("billing_state", ""),
+        })
 
     @staticmethod
     def _find_payment(order_id: str, payment_type: str):

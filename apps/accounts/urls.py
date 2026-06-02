@@ -18,6 +18,7 @@ from .payment_views import (
     CouponValidatePublicView,
     StudentInvoiceDownloadView,
     SchoolInvoiceDownloadView,
+    PaymentRetryView,
 )
 from .payment_webhook import HDFCWebhookView
 
@@ -37,6 +38,7 @@ urlpatterns = [
     path("me/checkout/", StudentCheckoutView.as_view()),
     path("me/payments/", StudentPaymentsView.as_view()),
     path("me/payments/<int:payment_id>/invoice/", StudentInvoiceDownloadView.as_view()),
+    path("me/payments/<int:payment_id>/retry/", PaymentRetryView.as_view(), {"type": "student"}),
     path("me/subscriptions/", StudentSubscriptionsView.as_view()),
     path("me/ledger/", StudentLedgerView.as_view()),
     path("me/comments/", StudentCommentView.as_view()),
@@ -49,6 +51,7 @@ urlpatterns = [
     path("school/checkout/", SchoolCheckoutView.as_view()),
     path("school/payments/", SchoolPaymentsHistoryView.as_view()),
     path("school/payments/<int:payment_id>/invoice/", SchoolInvoiceDownloadView.as_view()),
+    path("school/payments/<int:payment_id>/retry/", PaymentRetryView.as_view(), {"type": "school"}),
     path("school/subscriptions/", SchoolSubscriptionsView.as_view()),
     path("school/ledger/", SchoolLedgerView.as_view()),
     path("school/assign-modules/", SchoolStudentModuleAssignView.as_view()),
