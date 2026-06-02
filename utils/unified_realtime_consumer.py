@@ -67,6 +67,13 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if requested_voice in self._ALLOWED_VOICES:
             self._requested_voice = requested_voice
 
+        # Read optional accent preference from the client
+        self.accent = params.get('accent', '').lower()
+        if not self.accent:
+            user = self.scope.get('user')
+            if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
+                self.accent = user.settings.get('voice_accent', 'american').lower()
+
         if not self.feature_id:
             logger.warning("No 'feature' query param provided")
             return None
@@ -76,13 +83,20 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             logger.warning(f"Unknown feature identifier: {self.feature_id}")
             return None
 
-        logger.info(f"🔀 Unified consumer resolved feature={self.feature_id}, session={session_id}, voice={self._requested_voice}")
+        logger.info(f"🔀 Unified consumer resolved feature={self.feature_id}, session={session_id}, voice={self._requested_voice}, accent={self.accent}")
         return session_id
 
     def get_voice(self) -> str:
-        """Return the client-requested voice, falling back to the base default."""
+        """Return the voice to use, checking client override first, then database settings, then default."""
         if self._requested_voice:
             return self._requested_voice
+        
+        # Fallback to user settings
+        user = self.user or self.scope.get('user')
+        if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
+            persona = user.settings.get('voice_persona', 'male')
+            return 'marin' if persona == 'female' else 'cedar'
+            
         return super().get_voice()
 
     @sync_to_async
@@ -122,7 +136,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if not self.openai_ws or not self.handler:
             return
         try:
-            instructions = await self.get_instructions()
+            instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
             instructions += self.VOICE_STYLE_DIRECTIVE
             await self.openai_ws.send(json.dumps({
                 "type": "session.update",
@@ -140,7 +154,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if not self.handler:
             return await super().configure_openai_session()
 
-        instructions = await self.get_instructions()
+        instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
         instructions += self.VOICE_STYLE_DIRECTIVE
         custom_config = self.handler.get_session_config(
             self.session_id, self.user, instructions
