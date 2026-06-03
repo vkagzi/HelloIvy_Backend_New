@@ -74,6 +74,15 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
                 self.accent = user.settings.get('voice_accent', 'american').lower()
 
+        # Read optional language preference from the client
+        self.language = params.get('language', '').lower()
+        if not self.language or self.language not in ['en', 'hi']:
+            user = self.scope.get('user')
+            if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
+                self.language = user.settings.get('voice_language', 'en').lower()
+        if not self.language:
+            self.language = 'en'
+
         if not self.feature_id:
             logger.warning("No 'feature' query param provided")
             return None
@@ -83,7 +92,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             logger.warning(f"Unknown feature identifier: {self.feature_id}")
             return None
 
-        logger.info(f"🔀 Unified consumer resolved feature={self.feature_id}, session={session_id}, voice={self._requested_voice}, accent={self.accent}")
+        logger.info(f"🔀 Unified consumer resolved feature={self.feature_id}, session={session_id}, voice={self._requested_voice}, accent={self.accent}, language={self.language}")
         return session_id
 
     def get_voice(self) -> str:
@@ -137,7 +146,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             return
         try:
             instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
-            instructions += self.VOICE_STYLE_DIRECTIVE
+            instructions += self.get_voice_style_directive()
             await self.openai_ws.send(json.dumps({
                 "type": "session.update",
                 "session": {
@@ -155,7 +164,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             return await super().configure_openai_session()
 
         instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
-        instructions += self.VOICE_STYLE_DIRECTIVE
+        instructions += self.get_voice_style_directive()
         custom_config = self.handler.get_session_config(
             self.session_id, self.user, instructions
         )

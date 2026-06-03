@@ -87,6 +87,9 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         # Selected accent preference
         self.accent = None
         
+        # Selected language preference (e.g. 'en', 'hi')
+        self.language = 'en'
+        
         # Silent reconnection tracking
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 2
@@ -342,8 +345,30 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         "as if the conversation never paused or changed context.]"
     )
 
+    def get_voice_style_directive(self) -> str:
+        """Return the voice style directive, tailored for language settings."""
+        if getattr(self, 'language', 'en') == 'hi':
+            return (
+                "\n\n[Voice Style Consistency: Throughout the remainder of this conversation, you MUST speak in Hindi. "
+                "Ignore any previous instructions to speak or maintain voice style in English. You must transition "
+                "to speaking in warm, natural, and friendly Hindi immediately. "
+                "Ensure your text transcript output is always in English. "
+                "Maintain a consistent tone, pacing, energy level, and warmth at all times in Hindi.]"
+            )
+        return self.VOICE_STYLE_DIRECTIVE
+
     def get_accent_directive(self) -> str:
-        """Return the appropriate system instruction directive for the requested accent."""
+        """Return the appropriate system instruction directive for the requested accent/language."""
+        if getattr(self, 'language', 'en') == 'hi':
+            return (
+                "\n\n[Language and Transcript Directive: You are a Hindi-speaking counselor. You MUST converse with the student in Hindi. "
+                "Speak in clear, natural, and warm Hindi. The student will also speak in Hindi.\n"
+                "CRITICAL REQUIREMENT FOR CHATBOX TEXT: You must output your text transcripts in English. "
+                "Whenever you generate a response, your spoken audio MUST be in Hindi, but your text transcript "
+                "(which appears on the student's screen/chatbox) MUST be the English translation of what you said. "
+                "Do NOT write in Hindi script or Hinglish in the text transcript. Only output plain English text. "
+                "Example: if you speak 'नमस्ते, आप कैसे हैं?' in audio, your text transcript must be 'Hello, how are you?'.]"
+            )
         accent = getattr(self, 'accent', None)
         if accent == 'indian':
             return (
@@ -372,7 +397,7 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         try:
             logger.info(f"⚙️ Configuring session for {self.session_id} (accent: {getattr(self, 'accent', 'None')})")
             instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
-            instructions += self.VOICE_STYLE_DIRECTIVE
+            instructions += self.get_voice_style_directive()
             logger.info(f"📝 Got instructions (length: {len(instructions)} chars)")
             
             session_config = {
