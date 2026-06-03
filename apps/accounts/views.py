@@ -20,7 +20,7 @@ from .serializers import (
     UserModuleSubscriptionSerializer,
 )
 from .roles import UserRole
-from .models import EmailOTP, ModuleName, MODULE_META, ModulePricing, School, SchoolModuleSubscription, User
+from .models import EmailOTP, ModuleName, MODULE_META, ModulePricing, School, SchoolModuleSubscription, User, ActivityLog, UserPayment
 
 
 class SignupView(APIView):
@@ -115,6 +115,12 @@ class LoginView(APIView):
                 login_response_data,
             ) = AccountsService.login_user(email=serializer.validated_data["email"])
             if login_response_success:
+                ActivityLog.log(
+                    user=user,
+                    event_type="login",
+                    description=f"User logged in from {request.META.get('REMOTE_ADDR')}",
+                    request=request
+                )
                 return Response(
                     login_response_data,
                     status=200,
@@ -547,7 +553,15 @@ class ChangePasswordView(UserDTOView):
             user.set_password(serializer.validated_data["new_password"])
             user.force_password_change = False
             user.save(update_fields=["password", "force_password_change", "updated_at"])
-            return Response({"message": "Password changed successfully."}, status=200)
+            from .models import ActivityLog
+            user.save()
+            ActivityLog.log(
+                user=user,
+                event_type="password_reset",
+                description="User successfully reset their password",
+                request=request
+            )
+            return Response({"message": "Password reset successfully."}, status=200)
         return Response(serializer.errors, status=400)
 
 
@@ -613,10 +627,10 @@ class AdminUsersView(UserDTOView):
     def get(self, request: Request) -> Response:
         self._require_admin()
 
-        # Schooladmins see only their school's students
+        # Schooladmins see only their school's students and ops admins
         if self.user_dto.role == UserRole.SCHOOLADMIN and self.user_dto.school_id:
             users = User.objects.filter(
-                school_id=self.user_dto.school_id, role=UserRole.STUDENT
+                school_id=self.user_dto.school_id, role__in=[UserRole.STUDENT, UserRole.SCHOOLOPSADMIN]
             ).order_by("-created_at")
         else:
             users = User.objects.all().order_by("-created_at")
@@ -1467,5 +1481,105 @@ class StudentSendCounselorEmailView(UserDTOView):
             "counselor": {
                 "name": f"{counselor.first_name} {counselor.last_name}".strip() or counselor.email,
                 "email": counselor.email,
+            }
+        }, status=200)
+
+
+class AdminUserLogsView(UserDTOView):
+    """Fetch all logs and activity history for a user (admin only)."""
+
+    def _require_admin(self, user_id: int | None = None) -> None:
+        if self.user_dto.role not in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN, UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN):
+            raise PermissionDenied(detail="Admin access required")
+        if self.user_dto.role in (UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN) and user_id:
+            try:
+                target_user = User.objects.get(id=user_id)
+                if target_user.school_id != self.user_dto.school_id:
+                    raise PermissionDenied(detail="Access denied to this student")
+            except User.DoesNotExist:
+                pass
+
+    def get(self, request: Request, user_id: int) -> Response:
+        self._require_admin(user_id=user_id)
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        from domain_discovery.models import DomainSession
+        from career_discovery.models import CareerSession
+        
+        # 1. Activity Logs (Model)
+        activity_logs = ActivityLog.objects.filter(user=user).order_by("-created_at")
+        logs_data = [
+            {
+                "id": log.id,
+                "event_type": log.event_type,
+                "description": log.description,
+                "metadata": log.metadata,
+                "ip_address": log.ip_address,
+                "timestamp": log.created_at.isoformat(),
+            }
+            for log in activity_logs
+        ]
+
+        # 2. Module Sessions (History)
+        domain_sessions = DomainSession.objects.filter(user=user).order_by("-created_at")
+        career_sessions = CareerSession.objects.filter(user=user).order_by("-created_at")
+        
+        sessions_data = []
+        for s in domain_sessions:
+            sessions_data.append({
+                "module": "domain_discovery",
+                "session_id": str(s.session_id),
+                "is_completed": s.is_completed,
+                "created_at": s.created_at.isoformat(),
+                "type": "Session Start" if not s.is_completed else "Session Completed"
+            })
+        for s in career_sessions:
+            sessions_data.append({
+                "module": "career_discovery",
+                "session_id": str(s.session_id),
+                "is_completed": s.is_completed,
+                "created_at": s.created_at.isoformat(),
+                "type": "Session Start" if not s.is_completed else "Session Completed"
+            })
+
+        # 3. Payments
+        payments = UserPayment.objects.filter(user=user).order_by("-created_at")
+        payments_data = [
+            {
+                "amount": str(p.amount),
+                "status": p.status,
+                "created_at": p.created_at.isoformat(),
+                "modules": p.modules_purchased
+            }
+            for p in payments
+        ]
+
+        # Aggregate everything into a chronological timeline
+        timeline = []
+        for log in logs_data:
+            timeline.append({"type": "activity", "data": log, "timestamp": log["timestamp"]})
+        for sess in sessions_data:
+            timeline.append({"type": "session", "data": sess, "timestamp": sess["created_at"]})
+        for pay in payments_data:
+            timeline.append({"type": "payment", "data": pay, "timestamp": pay["created_at"]})
+        
+        timeline.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        return Response({
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": f"{user.first_name} {user.last_name}".strip(),
+            },
+            "timeline": timeline,
+            "stats": {
+                "total_logins": activity_logs.filter(event_type="login").count(),
+                "total_payments": payments.count(),
+                "completed_sessions": activity_logs.filter(event_type="module_complete").count(),
+                "total_interactions": activity_logs.filter(event_type="llm_interaction").count(),
+                "sessions_started": activity_logs.filter(event_type="module_start").count(),
             }
         }, status=200)
