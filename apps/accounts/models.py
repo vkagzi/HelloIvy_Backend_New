@@ -183,7 +183,7 @@ class User(models.Model):
         blank=True,
         null=True,
     )
-    terms_accepted = models.BooleanField(default=False)
+    terms_accepted = models.BooleanField(default=True)
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
     force_password_change = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)  # Only True after OTP verification
@@ -532,3 +532,33 @@ class CustomModule(models.Model):
 
     def __str__(self) -> str:
         return self.label
+
+
+class ActivityLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="activity_logs")
+    event_type = models.CharField(max_length=50) # 'login', 'payment', 'module_start', 'llm_interaction', etc.
+    description = models.TextField()
+    metadata = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.user.email} - {self.event_type} - {self.created_at}"
+
+    @staticmethod
+    def log(user, event_type, description, metadata=None, request=None):
+        ip_address = None
+        if request:
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip_address = x_forwarded_for.split(',')[0]
+            else:
+                ip_address = request.META.get('REMOTE_ADDR')
+        
+        return ActivityLog.objects.create(
+            user=user,
+            event_type=event_type,
+            description=description,
+            metadata=metadata or {},
+            ip_address=ip_address
+        )
