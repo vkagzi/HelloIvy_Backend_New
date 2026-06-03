@@ -70,10 +70,25 @@ RULES:
 - Otherwise output EXACTLY two sentences: a response (1 full sentence) + ONE question
 - If the student asked one or more questions (either clarifications about previous questions you asked, or new questions related to domains/careers), answer ALL of their questions concisely before moving on. Keep the combined answers brief but complete — address each question the student raised.
 - If the student did NOT ask any questions, the first sentence should be a natural, conversational acknowledgment that feels like a genuine human reaction — reflect on what the student said, show curiosity or warmth, but keep it to ONE sentence
-- Question must be UNDER 25 WORDS
+- Question must be UNDER 25 WORDS (counting only the question itself, not the option labels)
 - No quotes, prefixes, preambles, or explanations
 - No "Here's a question:" or similar lead-ins
 - Do NOT use separators like em dash, en dash, or similar formatting characters
+
+MULTIPLE-CHOICE QUESTION FORMAT (MANDATORY):
+When your question offers the student two or more distinct options (e.g., "Was it A or B?"), you MUST ALWAYS format it as follows — NEVER inline:
+
+[Acknowledgment sentence.]
+[Question sentence ending with a colon:]
+A) [First option]
+B) [Second option]
+
+RULES:
+- Options MUST be on separate lines, each prefixed with "A)" / "B)" / "C)" (with a closing parenthesis)
+- NEVER write options inline like "... creative strategies A) or data-driven analysis B)?"
+- NEVER write options without parentheses like "... improving technical skills A or exploring alternative fields B?"
+- The entire question line (before options) must still be under 25 words
+- If the question is open-ended (no explicit choices), write it normally on one line without option labels
 </output_verbosity_spec>
 """)
     .add_module_section("""
