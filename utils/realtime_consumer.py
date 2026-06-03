@@ -87,6 +87,9 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         # Selected accent preference
         self.accent = None
         
+        # Selected language preference
+        self.language = 'english'
+        
         # Silent reconnection tracking
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 2
@@ -367,13 +370,25 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
             )
         return ""
 
+    def get_language_directive(self) -> str:
+        """Return the appropriate system instruction directive for the requested language."""
+        if getattr(self, 'language', None) == 'hindi':
+            return (
+                "\n\n[Language Directive: You MUST conduct the entire conversation in Hindi (हिंदी). Respond ONLY in Hindi. "
+                "Understand Hindi inputs and speak Hindi back to the user. Do not use English script or English words except for "
+                "common academic/career terms like 'Dashboard', 'Stream', 'Engineering', etc.]"
+            )
+        return ""
+
     async def configure_openai_session(self):
         """Send initial session configuration to OpenAI with custom instructions"""
         try:
-            logger.info(f"⚙️ Configuring session for {self.session_id} (accent: {getattr(self, 'accent', 'None')})")
-            instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
+            logger.info(f"⚙️ Configuring session for {self.session_id} (accent: {getattr(self, 'accent', 'None')}, language: {getattr(self, 'language', 'english')})")
+            instructions = self.get_language_directive() + "\n\n" + self.get_accent_directive() + "\n\n" + await self.get_instructions()
             instructions += self.VOICE_STYLE_DIRECTIVE
             logger.info(f"📝 Got instructions (length: {len(instructions)} chars)")
+            
+            transcription_lang = "hi" if getattr(self, 'language', None) == 'hindi' else "en"
             
             session_config = {
                 "type": "session.update",
@@ -385,7 +400,7 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
                     "output_audio_format": "pcm16",
                     "input_audio_transcription": {
                         "model": "gpt-4o-transcribe",
-                        "language": "en",
+                        "language": transcription_lang,
                     },
                     "input_audio_noise_reduction": self.get_noise_reduction_config(),
                     "turn_detection": self.get_turn_detection_config(),

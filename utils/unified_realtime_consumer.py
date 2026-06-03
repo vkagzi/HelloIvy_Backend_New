@@ -74,6 +74,13 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
                 self.accent = user.settings.get('voice_accent', 'american').lower()
 
+        # Read optional language preference from the client
+        self.language = params.get('language', '').lower()
+        if not self.language:
+            user = self.scope.get('user')
+            if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
+                self.language = user.settings.get('voice_language', 'english').lower()
+
         if not self.feature_id:
             logger.warning("No 'feature' query param provided")
             return None
@@ -83,7 +90,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
             logger.warning(f"Unknown feature identifier: {self.feature_id}")
             return None
 
-        logger.info(f"🔀 Unified consumer resolved feature={self.feature_id}, session={session_id}, voice={self._requested_voice}, accent={self.accent}")
+        logger.info(f"🔀 Unified consumer resolved feature={self.feature_id}, session={session_id}, voice={self._requested_voice}, accent={self.accent}, language={self.language}")
         return session_id
 
     def get_voice(self) -> str:
@@ -136,13 +143,20 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if not self.openai_ws or not self.handler:
             return
         try:
-            instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
+            instructions = self.get_language_directive() + "\n\n" + self.get_accent_directive() + "\n\n" + await self.get_instructions()
             instructions += self.VOICE_STYLE_DIRECTIVE
+            
+            transcription_lang = "hi" if getattr(self, 'language', None) == 'hindi' else "en"
+            
             await self.openai_ws.send(json.dumps({
                 "type": "session.update",
                 "session": {
                     "instructions": instructions,
                     "voice": self.get_voice(),
+                    "input_audio_transcription": {
+                        "model": "gpt-4o-transcribe",
+                        "language": transcription_lang,
+                    },
                 },
             }))
             logger.info(f"🔄 Refreshed OpenAI instructions for feature={self.feature_id}, session={self.session_id}")
@@ -154,7 +168,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if not self.handler:
             return await super().configure_openai_session()
 
-        instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
+        instructions = self.get_language_directive() + "\n\n" + self.get_accent_directive() + "\n\n" + await self.get_instructions()
         instructions += self.VOICE_STYLE_DIRECTIVE
         custom_config = self.handler.get_session_config(
             self.session_id, self.user, instructions
