@@ -4,13 +4,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
 import logging
 import uuid
 import urllib.parse
+from decimal import Decimal
 
 from collections import Counter
 
@@ -297,6 +298,72 @@ def _build_module_list(payment) -> list[dict]:
     return items
 
 
+def _generate_payment_invoice(payment) -> bytes | None:
+    """Prepare InvoiceData and generate PDF bytes for a payment."""
+    logger.info(f"[Invoice] Generating PDF for payment_id={payment.id}")
+    
+    try:
+        from utils.invoice_pdf import InvoiceData, InvoiceLineItem, generate_invoice_pdf
+        
+        # Resolve data (common for both B2C and B2B where possible)
+        if isinstance(payment, UserPayment):
+            user = payment.user
+            email = user.email
+            user_name = user.first_name or user.email
+            first_name = user.first_name or ""
+            last_name = user.last_name or ""
+        else:
+            school = payment.school
+            email = school.contact_email
+            user_name = school.name
+            first_name = ""
+            last_name = ""
+
+        transaction_id = payment.gateway_transaction_id or str(payment.id)
+        payment_date = payment.updated_at.strftime("%d %b %Y") if hasattr(payment, "updated_at") else timezone.now().strftime("%d %b %Y")
+        currency = payment.currency or "INR"
+        
+        pricing = (payment.metadata or {}).get("pricing", {})
+        billing_state = (payment.metadata or {}).get("billing_state", "")
+        tax_label = "CGST (9%) + SGST (9%)" if billing_state == "maharashtra" else "IGST (18%)"
+        address = (payment.metadata or {}).get("address", "")
+        gst_number = (payment.metadata or {}).get("gst_number", "")
+
+        line_items = []
+        for entry in payment.modules_purchased:
+            line_items.append(InvoiceLineItem(
+                module=entry["module"],
+                quantity=entry.get("quantity", 1),
+                price=entry.get("price", DEFAULT_MODULE_PRICE),
+            ))
+
+        invoice_data = InvoiceData(
+            order_id=payment.id,
+            order_date=payment_date,
+            billing_name=user_name,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            address=address,
+            gst_number=gst_number,
+            line_items=line_items,
+            subtotal=pricing.get("subtotal", payment.amount),
+            discount=pricing.get("discount", 0),
+            discount_code=pricing.get("coupon_code"),
+            tax=pricing.get("tax", 0),
+            tax_label=tax_label,
+            total=payment.amount,
+            currency=currency,
+            transaction_id=transaction_id,
+            status=payment.status.capitalize(),
+            payment_mode="HDFC Gateway",
+        )
+        return generate_invoice_pdf(invoice_data)
+    except Exception:
+        logger.exception(f"[Invoice] Failed to generate invoice PDF for payment {payment.id}")
+        return None
+
+
 def _send_payment_status_email(payment, status: str, gateway_status: str | None = None) -> None:
     """Send payment success or failure email.
 
@@ -338,52 +405,7 @@ def _send_payment_status_email(payment, status: str, gateway_status: str | None 
             logger.info(f"[PaymentEmail] Sending SUCCESS email to {email}, pricing={pricing}, billing_state={billing_state}")
 
             # Generate invoice PDF attachment
-            invoice_pdf = None
-            try:
-                from utils.invoice_pdf import InvoiceData, InvoiceLineItem, generate_invoice_pdf
-
-                first_name = ""
-                last_name = ""
-                if isinstance(payment, UserPayment):
-                    first_name = payment.user.first_name or ""
-                    last_name = payment.user.last_name or ""
-
-                address = (payment.metadata or {}).get("address", "")
-                gst_number = (payment.metadata or {}).get("gst_number", "")
-
-                line_items = []
-                for entry in payment.modules_purchased:
-                    line_items.append(InvoiceLineItem(
-                        module=entry["module"],
-                        quantity=entry.get("quantity", 1),
-                        price=entry.get("price", DEFAULT_MODULE_PRICE),
-                    ))
-
-                invoice_data = InvoiceData(
-                    order_id=payment.id,
-                    order_date=payment_date,
-                    billing_name=user_name,
-                    first_name=first_name,
-                    last_name=last_name,
-                    email=email,
-                    address=address,
-                    gst_number=gst_number,
-                    line_items=line_items,
-                    subtotal=pricing.get("subtotal", payment.amount),
-                    discount=pricing.get("discount", 0),
-                    discount_code=pricing.get("coupon_code"),
-                    tax=pricing.get("tax", 0),
-                    tax_label=tax_label,
-                    total=payment.amount,
-                    currency=currency,
-                    transaction_id=transaction_id,
-                    status="Paid",
-                    payment_mode="HDFC Gateway",
-                )
-                invoice_pdf = generate_invoice_pdf(invoice_data)
-                logger.info(f"[PaymentEmail] Invoice PDF generated: {len(invoice_pdf)} bytes")
-            except Exception:
-                logger.exception(f"[PaymentEmail] Failed to generate invoice PDF for payment {payment.id}; sending email without attachment")
+            invoice_pdf = _generate_payment_invoice(payment) if status == "completed" else None
 
             send_payment_success_email(
                 email=email,
@@ -493,6 +515,31 @@ class StudentCheckoutView(APIView):
         )
         payment.set_status(UserPayment.Status.PENDING)
         payment.save()
+
+        # If total is 0 (e.g. 100% discount), bypass gateway and provision immediately
+        if total == 0:
+            payment.set_status(UserPayment.Status.COMPLETED)
+            payment.metadata = {
+                "pricing": order,
+                "billing_state": billing_state,
+                "first_name": first_name or user.first_name,
+                "last_name": last_name or user.last_name,
+                "email": email or user.email,
+                "phone": phone,
+                "address": address,
+                "gst_number": gst_number,
+                "is_zero_cost": True,
+            }
+            payment.save()
+            _provision_user_subscriptions(payment)
+            _send_payment_status_email(payment, "completed")
+            
+            return Response({
+                "payment_id": payment.id,
+                "is_zero_cost": True,
+                "status": "completed",
+                "message": "Checkout successful (100% discount applied)"
+            }, status=201)
 
         # Initialize HDFC payment order
         frontend_base = _get_frontend_base_url()
@@ -954,8 +1001,24 @@ class SchoolCheckoutView(UserDTOView):
         # Generate a unique order_id per attempt so retries work.
         hdfc_order_id = f"{payment.id}_{uuid.uuid4().hex[:8]}"
 
-        # HDFC may strip query params, so embed context in the URL path.
-        return_url = f"{frontend_base}/api/payment/return/{hdfc_order_id}/school"
+        # If total is 0, bypass gateway and provision immediately
+        if total == 0:
+            payment.set_status(SchoolPayment.Status.COMPLETED)
+            payment.metadata = {
+                **payment.metadata,
+                "pricing": order,
+                "is_zero_cost": True,
+            }
+            payment.save()
+            _provision_school_subscriptions_with_students(payment)
+            _send_payment_status_email(payment, "completed")
+
+            return Response({
+                "payment_id": payment.id,
+                "is_zero_cost": True,
+                "status": "completed",
+                "message": "Checkout successful (100% discount applied)"
+            }, status=201)
 
         try:
             gateway = get_payment_gateway()
@@ -1653,6 +1716,49 @@ class GradeAutoAssignView(UserDTOView):
         return Response({"rules": created, "count": len(created)}, status=201)
 
 
+class StudentInvoiceDownloadView(UserDTOView):
+    """Serve invoice PDF for a student payment."""
+
+    def get(self, request: Request, payment_id: int) -> HttpResponse | Response:
+        try:
+            payment = UserPayment.objects.get(id=payment_id, user_id=self.user_dto.id)
+        except UserPayment.DoesNotExist:
+            return Response({"error": "Payment not found"}, status=404)
+
+
+        pdf_bytes = _generate_payment_invoice(payment)
+        if not pdf_bytes:
+            return Response({"error": "Failed to generate invoice PDF"}, status=500)
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="HelloIvy_Invoice_{payment_id}.pdf"'
+        return response
+
+
+class SchoolInvoiceDownloadView(UserDTOView):
+    """Serve invoice PDF for a school payment."""
+
+    def _require_school_admin(self) -> None:
+        if self.user_dto.role not in (UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN) or self.user_dto.school_id is None:
+            raise PermissionDenied(detail="Only school admins can use this endpoint")
+
+    def get(self, request: Request, payment_id: int) -> HttpResponse | Response:
+        self._require_school_admin()
+        try:
+            payment = SchoolPayment.objects.get(id=payment_id, school_id=self.user_dto.school_id)
+        except SchoolPayment.DoesNotExist:
+            return Response({"error": "Payment not found"}, status=404)
+
+
+        pdf_bytes = _generate_payment_invoice(payment)
+        if not pdf_bytes:
+            return Response({"error": "Failed to generate invoice PDF"}, status=500)
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="HelloIvy_School_Invoice_{payment_id}.pdf"'
+        return response
+
+
 class GradeAutoAssignDeleteView(UserDTOView):
     """Deactivate an auto-assign rule."""
 
@@ -1674,6 +1780,128 @@ class GradeAutoAssignDeleteView(UserDTOView):
         rule.is_active = False
         rule.save()
         return Response({"message": "Auto-assign rule deactivated", "id": rule_id}, status=200)
+
+
+# ---------------------------------------------------------------------------
+# Payment retry — allow resuming a pending payment session
+# ---------------------------------------------------------------------------
+
+class PaymentRetryView(UserDTOView):
+    """
+    Re-initialize a pending payment session with HDFC.
+    
+    Used when a user returns to their dashboard and wants to complete
+     a payment that was previously started but not finished.
+    """
+
+    def post(self, request: Request, payment_id: int, **kwargs) -> Response:
+        payment_type = kwargs.get("type", "student")
+        
+        logger.info(f"[PaymentRetry] Received request for payment_id={payment_id}, type={payment_type}, user={self.user_dto.id}")
+
+        if payment_type == "school":
+            if self.user_dto.role not in (UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN) or self.user_dto.school_id is None:
+                raise PermissionDenied(detail="Only school admins can retry school payments")
+            try:
+                payment = SchoolPayment.objects.get(id=payment_id, school_id=self.user_dto.school_id)
+            except SchoolPayment.DoesNotExist:
+                return Response({"error": "Payment not found"}, status=404)
+        else:
+            try:
+                payment = UserPayment.objects.get(id=payment_id, user_id=self.user_dto.id)
+            except UserPayment.DoesNotExist:
+                logger.error(f"[PaymentRetry] UserPayment {payment_id} not found for user {self.user_dto.id}")
+                return Response({"error": "Payment not found"}, status=404)
+
+        if payment.status != payment.Status.PENDING:
+            logger.warning(f"[PaymentRetry] Attempted to retry non-pending payment {payment.id} (status: {payment.status})")
+            return Response({
+                "error": f"Only pending payments can be retried. Current status: {payment.status}",
+                "status": payment.status
+            }, status=400)
+
+        # Re-initialize HDFC payment order
+        frontend_base = _get_frontend_base_url()
+        
+        # Determine gateway type and details
+        type_str = "student" if payment_type == "student" else "school"
+        
+        # HDFC rejects a new session with a previously-used order_id.
+        # Generate a unique order_id per attempt so retries work.
+        hdfc_order_id = f"{payment.id}_{uuid.uuid4().hex[:8]}"
+        return_url = f"{frontend_base}/api/payment/return/{hdfc_order_id}/{type_str}"
+
+        try:
+            gateway = get_payment_gateway()
+            logger.info(f"[PaymentRetry] Resolved gateway: {gateway}")
+            
+            # Extract metadata for the gateway
+            # If metadata was lost or empty, the gateway order might fail,
+            # but we try to preserve what was there.
+            m = payment.metadata or {}
+            cust = m.get("customer") or {} # Some versions might store customer nested
+            
+            first_name = cust.get("first_name") or m.get("first_name", "")
+            last_name = cust.get("last_name") or m.get("last_name", "")
+            email = cust.get("email") or m.get("email", "")
+            phone = cust.get("phone") or m.get("phone", "")
+            address = cust.get("address") or m.get("address", "")
+            state = cust.get("state") or m.get("billing_state", "")
+
+            gateway_metadata = {
+                "payment_id": payment.id,
+                "order_id": hdfc_order_id,
+                "type": type_str,
+                "first_name": first_name or self.user_dto.first_name,
+                "last_name": last_name or self.user_dto.last_name,
+                "email": email or self.user_dto.email,
+                "phone": phone,
+                "address": address,
+                "state": state,
+                "return_url": return_url,
+            }
+            
+            logger.info(f"[PaymentRetry] Re-initializing HDFC session for payment {payment.id} with new order_id {hdfc_order_id}")
+            
+            gateway_response = gateway.create_payment_order(
+                amount=Decimal(str(payment.amount)),
+                currency=payment.currency or PAYMENT_CURRENCY,
+                metadata=gateway_metadata
+            )
+            
+            # Update payment record with new gateway details
+            payment.order_id = hdfc_order_id
+            # Gateway returns 'transaction_id', not 'gateway_transaction_id'
+            payment.gateway_transaction_id = gateway_response.get("transaction_id", "") or gateway_response.get("gateway_transaction_id", "")
+            payment.save()
+
+            payment_links = gateway_response.get("payment_links", {})
+            logger.info(f"[PaymentRetry] Raw gateway_response keys: {list(gateway_response.keys())}")
+            logger.info(f"[PaymentRetry] Payment links: {payment_links}")
+            
+            # Try web link first, then iframe, then top-level web key
+            payment_url = (
+                payment_links.get("web")
+                or payment_links.get("iframe")
+                or gateway_response.get("web")
+            )
+            
+            if not payment_url:
+                 logger.error(f"[PaymentRetry] Gateway did not return a payment URL for payment {payment.id}")
+                 return Response({"error": "Gateway did not return a payment URL"}, status=500)
+
+            logger.info(f"[PaymentRetry] Successfully re-initialized payment {payment.id}. New txn ID: {payment.gateway_transaction_id}")
+
+            return Response({
+                "payment_id": payment.id,
+                "payment_url": payment_url,
+                "gateway_transaction_id": payment.gateway_transaction_id,
+                "order_id": hdfc_order_id
+            })
+
+        except Exception as e:
+            logger.exception(f"[PaymentRetry] Failed to re-initialize HDFC session for payment {payment.id}: {e}")
+            return Response({"error": "Failed to re-initialize payment session. Please try again later."}, status=500)
 
 
 # ---------------------------------------------------------------------------
@@ -2086,10 +2314,20 @@ class PaymentReturnVerifyView(APIView):
         status_cls = payment.Status
 
         # Already terminal — return immediately
-        if payment.status == status_cls.COMPLETED:
-            return Response({"payment_id": payment.id, "status": "completed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
-        if payment.status == status_cls.FAILED:
-            return Response({"payment_id": payment.id, "status": "failed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
+        if payment.status in (status_cls.COMPLETED, status_cls.FAILED):
+            res_data = {
+                "payment_id": payment.id,
+                "status": "completed" if payment.status == status_cls.COMPLETED else "failed",
+                "type": payment_type,
+                "amount": payment.amount,
+                "currency": payment.currency or "INR",
+            }
+            # Include cart details for failure flow to allow immediate retry
+            if payment.status == status_cls.FAILED:
+                res_data["modules"] = ",".join(m["module"] for m in payment.modules_purchased)
+                res_data["billing_state"] = (payment.metadata or {}).get("billing_state", "")
+
+            return Response(res_data)
 
         # Verify with HDFC
         stored_order_id = payment.order_id or str(payment.id)
@@ -2120,7 +2358,13 @@ class PaymentReturnVerifyView(APIView):
                 _provision_school_subscriptions_with_students(payment)
             _send_payment_status_email(payment, "completed")
             logger.info(f"[PaymentReturn] Payment {payment.id} completed via return flow")
-            return Response({"payment_id": payment.id, "status": "completed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
+            return Response({
+                "payment_id": payment.id,
+                "status": "completed",
+                "type": payment_type,
+                "amount": payment.amount,
+                "currency": payment.currency or "INR"
+            })
 
         # User is already back from the gateway — any non-success status
         # means the payment will not complete.  Mark it failed so the
@@ -2133,7 +2377,15 @@ class PaymentReturnVerifyView(APIView):
         payment.metadata["verification"] = _slim_gateway_verification(result.get("gateway_response", {}))
         payment.save()
         _send_payment_status_email(payment, "failed", gateway_status=hdfc_status)
-        return Response({"payment_id": payment.id, "status": "failed", "type": payment_type, "amount": payment.amount, "currency": payment.currency or "INR"})
+        return Response({
+            "payment_id": payment.id,
+            "status": "failed",
+            "type": payment_type,
+            "amount": payment.amount,
+            "currency": payment.currency or "INR",
+            "modules": ",".join(m["module"] for m in payment.modules_purchased),
+            "billing_state": (payment.metadata or {}).get("billing_state", ""),
+        })
 
     @staticmethod
     def _find_payment(order_id: str, payment_type: str):
