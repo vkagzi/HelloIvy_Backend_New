@@ -26,8 +26,20 @@ CAREER_INTRO_MESSAGE = (
 )
 
 
-def build_career_intro_message(user_name: str, primary_domain: str, secondary_domain: str = None) -> str:
+def build_career_intro_message(user_name: str, primary_domain: str, secondary_domain: str = None, language: str = 'en') -> str:
     """Build a personalized intro message with the user's name and selected domains."""
+    if language == 'hi':
+        if secondary_domain:
+            return (
+                f"नमस्ते {user_name}, मुझे आपके करियर विकल्पों को तलाशने में आपकी मदद करने में बहुत खुशी हो रही है। "
+                f"आपने 1. {primary_domain} और 2. {secondary_domain} को अपने डोमेन विकल्पों के रूप में चुना है। "
+                f"क्या हम शुरू करें?"
+            )
+        return (
+            f"नमस्ते {user_name}, मुझे आपके करियर विकल्पों को तलाशने में आपकी मदद करने में बहुत खुशी हो रही है। "
+            f"आपने {primary_domain} को अपने डोमेन विकल्प के रूप में चुना है। "
+            f"क्या हम शुरू करें?"
+        )
     if secondary_domain:
         return (
             f"Hi {user_name}, I am excited to help you explore your career choices. "
@@ -231,12 +243,20 @@ class CareerDiscoveryService:
         notes_thread = threading.Thread(target=_generate_notes_background, daemon=True)
         notes_thread.start()
         
+        # Get language from settings
+        from utils.user_helpers import get_user_instance
+        user_instance = get_user_instance(user)
+        language = 'en'
+        if user_instance and hasattr(user_instance, 'settings') and isinstance(user_instance.settings, dict):
+            language = user_instance.settings.get('voice_language', 'en').lower()
+
         # Dynamic intro message with user name and selected domains
         user_name = get_user_display_name(None, user, 'there')
         intro_message = build_career_intro_message(
             user_name=user_name,
             primary_domain=primary_domain,
             secondary_domain=secondary_domain,
+            language=language,
         )
         CareerMessage.objects.create(
             session=session,
@@ -292,27 +312,25 @@ class CareerDiscoveryService:
         - total_steps: int
         - is_complete: bool
         """
-        current_step = session.current_step
+        # Get language from settings
+        language = 'en'
+        if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
+            language = session.user.settings.get('voice_language', 'en').lower()
 
-        # Save user message
-        user_msg = CareerMessage.objects.create(
-            session=session,
-            message_id=f"msg_{uuid.uuid4().hex[:8]}",
-            type='user',
-            content=user_message,
-            step_number=current_step
+        PRE_FINAL_QUESTION_HI = (
+            "आज आपसे बात करके बहुत अच्छा लगा! इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?"
         )
 
-        # Increment step
-        new_step = current_step + 1
-        session.current_step = new_step
+        CONCLUSION_MSG_HI = (
+            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        )
 
-        PRE_FINAL_QUESTION = (
+        PRE_FINAL_QUESTION = PRE_FINAL_QUESTION_HI if language == 'hi' else (
             "It was fantastic talking to you today! Is there one final question "
             "you wish to ask before we close our session?"
         )
 
-        CONCLUSION_MSG = (
+        CONCLUSION_MSG = CONCLUSION_MSG_HI if language == 'hi' else (
             "Thank you for sharing all of that with me! 🎉 I've learned so much about "
             "your interests and strengths. Let me analyze everything and prepare your "
             "personalized career recommendations. Head over to see your results!"
@@ -369,6 +387,7 @@ class CareerDiscoveryService:
                     domain_context=domain_context,
                     session_notes=session.notes or "",
                     token_usage=token_usage,
+                    language=language,
                 )
                 
                 # Save token usage
@@ -411,7 +430,16 @@ class CareerDiscoveryService:
         """
         from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-        CONCLUSION_MSG = (
+        # Get language from settings
+        language = 'en'
+        if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
+            language = session.user.settings.get('voice_language', 'en').lower()
+
+        CONCLUSION_MSG_HI = (
+            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        )
+
+        CONCLUSION_MSG = CONCLUSION_MSG_HI if language == 'hi' else (
             "Thank you for sharing all of that with me! 🎉 I've learned so much about "
             "your interests and strengths. Let me analyze everything and prepare your "
             "personalized career recommendations. Head over to see your results!"
@@ -426,21 +454,29 @@ class CareerDiscoveryService:
             from utils.user_helpers import get_user_display_name as _get_name
             profile_context = format_user_profile_context(user_profile, user_name=_get_name(None, session.user, ''))
 
+            system_prompt = (
+                "You are a warm, supportive career counselor. The student was asked "
+                "if they have one final question before the session closes.\n\n"
+                "Below is the student's profile and the full conversation history "
+                "so you have context to answer any question they may ask.\n\n"
+                f"STUDENT PROFILE:\n{profile_context}\n\n"
+                "Determine if the student's response contains a genuine question. "
+                "If YES: answer it concisely (2-3 sentences max), drawing on the "
+                "conversation context and their profile, then end with the "
+                "exact closing line provided below.\n"
+                "If NO (they said no, goodbye, thanks, etc.): respond ONLY with the "
+                "exact closing line below.\n\n"
+                f"CLOSING LINE: {CONCLUSION_MSG}"
+            )
+            if language == 'hi':
+                system_prompt += (
+                    "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                    "Do NOT use English or Hinglish. If they ask a question, answer it warmly and concisely in Hindi, "
+                    "then end with the exact closing line: " + CONCLUSION_MSG + "]"
+                )
+
             llm_messages = [
-                SystemMessage(content=(
-                    "You are a warm, supportive career counselor. The student was asked "
-                    "if they have one final question before the session closes.\n\n"
-                    "Below is the student's profile and the full conversation history "
-                    "so you have context to answer any question they may ask.\n\n"
-                    f"STUDENT PROFILE:\n{profile_context}\n\n"
-                    "Determine if the student's response contains a genuine question. "
-                    "If YES: answer it concisely (2-3 sentences max), drawing on the "
-                    "conversation context and their profile, then end with the "
-                    "exact closing line provided below.\n"
-                    "If NO (they said no, goodbye, thanks, etc.): respond ONLY with the "
-                    "exact closing line below.\n\n"
-                    f"CLOSING LINE: {CONCLUSION_MSG}"
-                )),
+                SystemMessage(content=system_prompt),
             ]
 
             # Add conversation history

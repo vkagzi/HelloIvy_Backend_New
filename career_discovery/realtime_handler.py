@@ -107,6 +107,13 @@ class CareerDiscoveryHandler(BaseFeatureHandler):
         try:
             from career_discovery.langchain_service import career_langchain_service
 
+            # Get language from settings
+            from utils.user_helpers import get_user_instance
+            user_instance = get_user_instance(user)
+            language = 'en'
+            if user_instance and hasattr(user_instance, 'settings') and isinstance(user_instance.settings, dict):
+                language = user_instance.settings.get('voice_language', 'en').lower()
+
             if not context:
                 try:
                     prompt_data = career_langchain_service.build_prompt_for_step(
@@ -114,6 +121,7 @@ class CareerDiscoveryHandler(BaseFeatureHandler):
                         user_profile={},
                         domain_context={},
                         session_notes="",
+                        language=language,
                     )
                     instructions = prompt_data["system_prompt"]
                     if prompt_data["dynamic_context"]:
@@ -148,6 +156,7 @@ class CareerDiscoveryHandler(BaseFeatureHandler):
                 domain_context=domain_context_with_choices,
                 session_notes=session_info.get('notes', ''),
                 messages=None,
+                language=language,
             )
 
             instructions = prompt_data["system_prompt"]
@@ -161,22 +170,41 @@ class CareerDiscoveryHandler(BaseFeatureHandler):
 
             status_line = ''
             if is_concluding:
-                if not pre_final_asked:
-                    status_line = (
-                        '- STATUS: The session evaluation has determined we have gathered enough information. '
-                        'In your NEXT response, ask the student: "It was fantastic talking to you today! '
-                        'Is there one final question you wish to ask before we close our session?" '
-                        'Wait for their response before wrapping up. '
-                        'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
-                    )
+                if language == 'hi':
+                    if not pre_final_asked:
+                        status_line = (
+                            '- STATUS: The session evaluation has determined we have gathered enough information. '
+                            'In your NEXT response, ask the student: "आज आपसे बात करके बहुत अच्छा लगा! '
+                            'इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?" '
+                            'Wait for their response before wrapping up. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
+                        )
+                    else:
+                        status_line = (
+                            '- STATUS: The pre-final question has already been asked. '
+                            'If the student asked a question, answer it briefly and warmly in Hindi Devanagari (2-3 sentences). '
+                            'Then wrap up the conversation in Hindi Devanagari: thank them for sharing, let them know their '
+                            'personalized career recommendations are being prepared, and say goodbye. '
+                            'Exact closing message: "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"'
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
+                        )
                 else:
-                    status_line = (
-                        '- STATUS: The pre-final question has already been asked. '
-                        'If the student asked a question, answer it briefly and warmly (2-3 sentences). '
-                        'Then wrap up the conversation: thank them for sharing, let them know their '
-                        'personalized career recommendations are being prepared, and say goodbye. '
-                        'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. The goodbye should feel natural and continuous, not like a different speaker.'
-                    )
+                    if not pre_final_asked:
+                        status_line = (
+                            '- STATUS: The session evaluation has determined we have gathered enough information. '
+                            'In your NEXT response, ask the student: "It was fantastic talking to you today! '
+                            'Is there one final question you wish to ask before we close our session?" '
+                            'Wait for their response before wrapping up. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
+                        )
+                    else:
+                        status_line = (
+                            '- STATUS: The pre-final question has already been asked. '
+                            'If the student asked a question, answer it briefly and warmly (2-3 sentences). '
+                            'Then wrap up the conversation: thank them for sharing, let them know their '
+                            'personalized career recommendations are being prepared, and say goodbye. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. The goodbye should feel natural and continuous, not like a different speaker.'
+                        )
 
             instructions += f"""
 {domain_selection_instructions}

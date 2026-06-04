@@ -18,12 +18,21 @@ from utils.profile_helpers import get_user_profile_data
 from utils.user_helpers import get_user_display_name
 
 
-def build_intro_message(user, preferences_data: dict) -> str:
+def build_intro_message(user, preferences_data: dict, language: str = 'en') -> str:
     """Build a personalized opening message using the student's name and preferences."""
     name = get_user_display_name(user=user)
     degree_type = preferences_data.get('degree_type', 'college')
     primary_major = preferences_data.get('primary_major', '')
     secondary_major = preferences_data.get('secondary_major', '')
+
+    if language == 'hi':
+        msg = f"नमस्ते {name}, मुझे बहुत खुशी है कि आप {degree_type} डिग्री प्राप्त करना चाहते हैं"
+        if primary_major:
+            msg += f", जिसमें आपका मुख्य विषय (major) {primary_major} होगा"
+        if secondary_major:
+            msg += f" और सहायक विषय (minor) {secondary_major} होगा"
+        msg += "। क्या हम शुरू करें? बस कहें, हाँ!"
+        return msg
 
     msg = f"Hi {name}, excited that you wish to pursue a {degree_type} degree"
     if primary_major:
@@ -193,8 +202,13 @@ class CollegeSelectorService:
         session.metadata = metadata
         session.save(update_fields=['preferences', 'preferences_completed', 'current_phase', 'metadata', 'updated_at'])
 
+        # Get language from settings
+        language = 'en'
+        if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
+            language = session.user.settings.get('voice_language', 'en').lower()
+
         # Create initial bot message
-        intro = build_intro_message(session.user, preferences_data)
+        intro = build_intro_message(session.user, preferences_data, language=language)
         CollegeSelectorMessage.objects.create(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
@@ -228,6 +242,11 @@ class CollegeSelectorService:
         current_step = session.current_step
         new_step = current_step + 1
 
+        # Get language from settings
+        language = 'en'
+        if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
+            language = session.user.settings.get('voice_language', 'en').lower()
+
         # Save user message
         CollegeSelectorMessage.objects.create(
             session=session,
@@ -242,10 +261,16 @@ class CollegeSelectorService:
 
         if new_step >= self.max_conversation_questions:
             is_complete = True
-            bot_response = (
-                "Thank you for all your questions! I now have a great understanding of what you're looking for. "
-                "Let me prepare your personalized list of 20 college recommendations. Head over to see your results!"
-            )
+            if language == 'hi':
+                bot_response = (
+                    "सभी प्रश्नों के लिए धन्यवाद! अब मुझे अच्छी तरह समझ आ गया है कि आप क्या तलाश रहे हैं। "
+                    "मुझे आपके लिए 20 कॉलेज सिफारिशों की व्यक्तिगत सूची तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+                )
+            else:
+                bot_response = (
+                    "Thank you for all your questions! I now have a great understanding of what you're looking for. "
+                    "Let me prepare your personalized list of 20 college recommendations. Head over to see your results!"
+                )
             session.total_steps = new_step
             session.current_phase = 'completed'
             session.save(update_fields=['current_step', 'total_steps', 'current_phase', 'updated_at'])
@@ -261,6 +286,7 @@ class CollegeSelectorService:
                 messages=all_messages,
                 user_message=user_message,
                 token_usage=token_usage,
+                language=language,
             )
 
             bot_response = result["response"]

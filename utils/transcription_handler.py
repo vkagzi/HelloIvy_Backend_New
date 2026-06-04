@@ -42,14 +42,26 @@ class TranscriptionOnlyHandler(BaseFeatureHandler):
         transcription via ``conversation.item.input_audio_transcription.*``
         events.
         """
+        import os
+        from django.conf import settings
+        transcription_model = "gpt-4o-transcribe"
+        if not os.getenv('OPENAI_API_KEY'):
+            transcription_model = getattr(settings, 'AZURE_OPENAI_WHISPER_DEPLOYMENT', 'whisper')
+
+        language = 'en'
+        if user and hasattr(user, 'settings') and isinstance(user.settings, dict):
+            language = user.settings.get('voice_language', 'en').lower()
+        if language not in ['en', 'hi']:
+            language = 'en'
+
         return {
             "type": "session.update",
             "session": {
                 "modalities": ["text"],
                 "input_audio_format": "pcm16",
                 "input_audio_transcription": {
-                    "model": "gpt-4o-transcribe",
-                    "language": "en",
+                    "model": transcription_model,
+                    "language": language,
                 },
                 "turn_detection": None,
             },

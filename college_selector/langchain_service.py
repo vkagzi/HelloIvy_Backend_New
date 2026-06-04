@@ -220,6 +220,7 @@ class CollegeSelectorLangChainService:
         messages: List[Dict[str, Any]],
         user_message: str,
         token_usage: Dict = None,
+        language: str = 'en',
     ) -> Dict[str, Any]:
         """Generate a conversational response given the student's preferences and message history."""
         if token_usage is None:
@@ -232,6 +233,14 @@ class CollegeSelectorLangChainService:
             preferences_context=preferences_context,
             profile_context=profile_context,
         )
+
+        if language == 'hi':
+            system_prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including greetings, questions, comparison highlights, "
+                "and acknowledgments, must be written in clear, warm, and natural Devanagari Hindi text. "
+                "When returning the JSON object, ensure the 'response' key contains Hindi text while 'student_done' remains boolean.]"
+            )
 
         langchain_messages = [SystemMessage(content=system_prompt)]
         for msg in messages:
@@ -346,7 +355,7 @@ class CollegeSelectorLangChainService:
             logger.error(traceback.format_exc())
             raise
 
-    def build_voice_instructions(self, preferences: dict, user_profile: dict, session_info: dict) -> str:
+    def build_voice_instructions(self, preferences: dict, user_profile: dict, session_info: dict, language: str = 'en') -> str:
         """Build system instructions for voice mode."""
         preferences_context = build_preferences_context(preferences)
         profile_context = format_user_profile_context(user_profile)
@@ -363,8 +372,7 @@ class CollegeSelectorLangChainService:
                 'let them know their personalized college recommendations are being prepared, and say goodbye. '
                 'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
             )
-
-        return f"""You are Ivy — a knowledgeable and warm college admissions counselor having a voice conversation with a student.
+        instructions = f"""You are Ivy — a knowledgeable and warm college admissions counselor having a voice conversation with a student.
 
 The student has filled out their college selection preferences:
 
@@ -418,6 +426,14 @@ VOICE-SPECIFIC GUIDELINES:
 - VOICE CONSISTENCY: Maintain the same voice style, tone, pacing, energy level, and expressiveness from the very first message through to the conclusion. Whether you are asking questions, acknowledging responses, presenting country comparisons, delivering the closing message, or resuming after a pause — your voice should sound like the same person throughout.
 </voice_conversation_context>
 """
+        if language == 'hi':
+            instructions += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including greetings, explanations, and questions, "
+                "must be written in clear, warm, and natural Devanagari Hindi text. "
+                "Keep responses concise and natural for voice conversation. Keep the voice query response under 30 words.]"
+            )
+        return instructions
 
     def evaluate_conclusion(
         self,

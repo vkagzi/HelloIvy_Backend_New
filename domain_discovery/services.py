@@ -30,6 +30,20 @@ DOMAIN_INTRO_MESSAGE = (
     "Remember, there are no right or wrong answers\u2014just be yourself. Shall we get started?"
 )
 
+DOMAIN_INTRO_MESSAGE_HI_MALE = (
+    "नमस्ते, मैं आईवी हूँ—आपका करियर और शिक्षा मार्गदर्शक। "
+    "इस मॉड्यूल में, मैं आपको यह जानने में मदद करूँगा कि कौन सा स्ट्रीम और विषय आपके लिए सबसे उपयुक्त हैं।\n\n"
+    "कृपया ईमानदारी से उत्तर दें, यदि कुछ स्पष्ट न हो तो पूछें, और बहुविकल्पीय प्रश्नों के लिए बस A, B या C के साथ उत्तर दें।\n\n"
+    "याद रखें, कोई सही या गलत उत्तर नहीं हैं—बस स्वाभाविक रहें। क्या हम शुरू करें?"
+)
+
+DOMAIN_INTRO_MESSAGE_HI_FEMALE = (
+    "नमस्ते, मैं आईवी हूँ—आपकी करियर और शिक्षा मार्गदर्शिका। "
+    "इस मॉड्यूल में, मैं आपको यह जानने में मदद करूँगी कि कौन सा स्ट्रीम और विषय आपके लिए सबसे उपयुक्त हैं।\n\n"
+    "कृपया ईमानदारी से उत्तर दें, यदि कुछ स्पष्ट न हो तो पूछें, और बहुविकल्पीय प्रश्नों के लिए बस A, B या C के साथ उत्तर दें।\n\n"
+    "याद रखें, कोई सही या गलत उत्तर नहीं हैं—बस स्वाभाविक रहें। क्या हम शुरू करें?"
+)
+
 
 class DomainDiscoveryService:
     """
@@ -351,12 +365,26 @@ class DomainDiscoveryService:
         )
         notes_thread.start()
         
+        # Get language and persona from settings
+        from utils.user_helpers import get_user_instance
+        user_instance = get_user_instance(user)
+        language = 'en'
+        persona = 'male'
+        if user_instance and hasattr(user_instance, 'settings') and isinstance(user_instance.settings, dict):
+            language = user_instance.settings.get('voice_language', 'en').lower()
+            persona = user_instance.settings.get('voice_persona', 'male').lower()
+            
+        if language == 'hi':
+            intro_content = DOMAIN_INTRO_MESSAGE_HI_FEMALE if persona == 'female' else DOMAIN_INTRO_MESSAGE_HI_MALE
+        else:
+            intro_content = DOMAIN_INTRO_MESSAGE
+
         # Static intro message — no LLM call needed
         DomainMessage.objects.create(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
             type='bot',
-            content=DOMAIN_INTRO_MESSAGE,
+            content=intro_content,
             question_type='general',
             choices=[]
         )
@@ -447,12 +475,25 @@ class DomainDiscoveryService:
         is_complete = False
         is_last_question = False
 
-        PRE_FINAL_QUESTION = (
+        # Get language from settings
+        language = 'en'
+        if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
+            language = session.user.settings.get('voice_language', 'en').lower()
+
+        PRE_FINAL_QUESTION_HI = (
+            "आज आपसे बात करके बहुत अच्छा लगा! इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?"
+        )
+
+        CONCLUSION_MSG_HI = (
+            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और जिज्ञासाओं के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत डोमेन सिफ़ारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        )
+
+        PRE_FINAL_QUESTION = PRE_FINAL_QUESTION_HI if language == 'hi' else (
             "It was fantastic talking to you today! Is there one final question "
             "you wish to ask before we close our session?"
         )
 
-        CONCLUSION_MSG = (
+        CONCLUSION_MSG = CONCLUSION_MSG_HI if language == 'hi' else (
             "Thank you for sharing all of that with me! 🎉 I've learned so much about "
             "your interests and curiosities. Let me analyze everything and prepare your "
             "personalized domain recommendations. Head over to see your results!"
@@ -527,6 +568,7 @@ class DomainDiscoveryService:
                 session_notes=session.notes or "",
                 token_usage=token_usage,
                 user_name=get_user_display_name(None, session.user, ''),
+                language=language,
             )
 
             bot_response = result['question']
@@ -603,7 +645,15 @@ class DomainDiscoveryService:
         """
         from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-        CONCLUSION_MSG = (
+        language = 'en'
+        if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
+            language = session.user.settings.get('voice_language', 'en').lower()
+
+        CONCLUSION_MSG_HI = (
+            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और जिज्ञासाओं के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत डोमेन सिफ़ारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        )
+
+        CONCLUSION_MSG = CONCLUSION_MSG_HI if language == 'hi' else (
             "Thank you for sharing all of that with me! 🎉 I've learned so much about "
             "your interests and curiosities. Let me analyze everything and prepare your "
             "personalized domain recommendations. Head over to see your results!"
@@ -615,21 +665,29 @@ class DomainDiscoveryService:
             user_profile = get_user_profile_data(session.user)
             profile_context = format_user_profile_context(user_profile, user_name=get_user_display_name(None, session.user, ''))
 
+            system_instruction = (
+                "You are a warm, supportive academic counselor. The student was asked "
+                "if they have one final question before the session closes.\n\n"
+                "Below is the student's profile and the full conversation history "
+                "so you have context to answer any question they may ask.\n\n"
+                f"STUDENT PROFILE:\n{profile_context}\n\n"
+                "Determine if the student's response contains a genuine question. "
+                "If YES: answer it concisely (2-3 sentences max), drawing on the "
+                "conversation context and their profile, then end with the "
+                "exact closing line provided below.\n"
+                "If NO (they said no, goodbye, thanks, etc.): respond ONLY with the "
+                "exact closing line below.\n\n"
+                f"CLOSING LINE: {CONCLUSION_MSG}"
+            )
+            if language == 'hi':
+                system_instruction += (
+                    "\n\n[CRITICAL Hindi Instruction: You MUST answer the student's question in Hindi using Devanagari script. "
+                    "Do NOT use English or Hinglish. Your response must be in clear, warm, and natural Hindi. "
+                    "Ensure you end with the exact CLOSING LINE in Hindi provided above.]"
+                )
+
             llm_messages = [
-                SystemMessage(content=(
-                    "You are a warm, supportive academic counselor. The student was asked "
-                    "if they have one final question before the session closes.\n\n"
-                    "Below is the student's profile and the full conversation history "
-                    "so you have context to answer any question they may ask.\n\n"
-                    f"STUDENT PROFILE:\n{profile_context}\n\n"
-                    "Determine if the student's response contains a genuine question. "
-                    "If YES: answer it concisely (2-3 sentences max), drawing on the "
-                    "conversation context and their profile, then end with the "
-                    "exact closing line provided below.\n"
-                    "If NO (they said no, goodbye, thanks, etc.): respond ONLY with the "
-                    "exact closing line below.\n\n"
-                    f"CLOSING LINE: {CONCLUSION_MSG}"
-                )),
+                SystemMessage(content=system_instruction),
             ]
 
             # Add conversation history

@@ -411,6 +411,7 @@ Generate the coaching notes:"""
         max_questions: int = 20,
         session_notes: str = "",
         user_name: str = "",
+        language: str = 'en',
     ) -> str:
         """Build the shared Stream & Subject Selection system instructions.
 
@@ -428,7 +429,7 @@ Generate the coaching notes:"""
                 f"{session_notes}"
             )
 
-        return DEEPDIVE_QUESTION_GENERATION_PROMPT.format(
+        instructions = DEEPDIVE_QUESTION_GENERATION_PROMPT.format(
             predefined_domains=FORMATTED_DOMAINS_WITH_DESC,
             current_question_number=current_question_number,
             min_questions=min_questions,
@@ -436,15 +437,23 @@ Generate the coaching notes:"""
             user_profile_context=profile_context + notes_context,
         )
 
+        if language == 'hi':
+            instructions += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including greetings, questions, and acknowledgments, "
+                "must be written in clear, warm, and natural Devanagari Hindi text. Keep the question under 25 words.]"
+            )
+        return instructions
+
     # ================== Unified Prompt Builder ==================
 
-    def _build_initial_question_prompt(self, user_profile: Dict[str, Any] = None, user_name: str = "") -> str:
+    def _build_initial_question_prompt(self, user_profile: Dict[str, Any] = None, user_name: str = "", language: str = 'en') -> str:
         """Build the HumanMessage prompt for the first question (greeting + profile check)."""
         profile_context = format_user_profile_context(user_profile or {}, user_name=user_name)
 
         name_part = user_name if user_name else "there"
 
-        return f"""You are HelloIvy Stream & Subject Selection Coach — a warm, encouraging counselor helping a student discover their ideal academic domain.
+        prompt = f"""You are HelloIvy Stream & Subject Selection Coach — a warm, encouraging counselor helping a student discover their ideal academic domain.
 
 The 13 predefined domains are:
 {FORMATTED_DOMAINS_WITH_DESC}
@@ -465,6 +474,14 @@ REQUIREMENTS:
 
 Generate the opening message:"""
 
+        if language == 'hi':
+            prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST generate this opening message in Hindi using Devanagari script only. "
+                "Translate the core meaning of the requirements (greeting, profile check, and warm transition) into natural and warm Devanagari Hindi. "
+                "Ensure NO English letters or Hinglish is used. Keep the message under 100 words.]"
+            )
+        return prompt
+
     def build_prompt_for_step(
         self,
         step: int,
@@ -473,6 +490,7 @@ Generate the opening message:"""
         max_questions: int = 35,
         session_notes: str = "",
         user_name: str = "",
+        language: str = 'en',
     ) -> Dict[str, Any]:
         """Build prompt content for any question number.
 
@@ -507,12 +525,13 @@ Generate the opening message:"""
             max_questions=max_questions,
             session_notes=session_notes,
             user_name=user_name,
+            language=language,
         )
 
         # Step 1 uses a special standalone greeting prompt
         user_prompt = None
         if step == 1:
-            user_prompt = self._build_initial_question_prompt(user_profile, user_name=user_name)
+            user_prompt = self._build_initial_question_prompt(user_profile, user_name=user_name, language=language)
 
         return {
             "system_prompt": system_prompt,
@@ -531,7 +550,7 @@ Generate the opening message:"""
         Uses the content pieces from ``build_prompt_for_step`` and adds
         conversation history + the latest user response.  This is only
         needed by the text flow — the voice flow uses
-        ``prompt_data['system_prompt']`` directly.
+        Prompt_data['system_prompt']`` directly.
         """
         if step == 1:
             # Step 1: standalone greeting prompt (no system message)
@@ -569,6 +588,7 @@ Generate the opening message:"""
         session_notes: str = "",
         token_usage: Dict = None,
         user_name: str = "",
+        language: str = 'en',
     ) -> Dict[str, Any]:
         """Generate a question for any step number.
 
@@ -588,6 +608,7 @@ Generate the opening message:"""
                 max_questions=max_questions,
                 session_notes=session_notes,
                 user_name=user_name,
+                language=language,
             )
 
             llm_messages = self._build_llm_messages(

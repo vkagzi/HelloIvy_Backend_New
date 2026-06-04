@@ -82,6 +82,13 @@ class CollegeSelectorHandler(BaseFeatureHandler):
         try:
             from college_selector.langchain_service import college_selector_langchain_service
 
+            # Get language from settings
+            from utils.user_helpers import get_user_instance
+            user_instance = get_user_instance(user)
+            language = 'en'
+            if user_instance and hasattr(user_instance, 'settings') and isinstance(user_instance.settings, dict):
+                language = user_instance.settings.get('voice_language', 'en').lower()
+
             if not context:
                 return "You are a helpful college admissions counselor."
 
@@ -93,6 +100,7 @@ class CollegeSelectorHandler(BaseFeatureHandler):
                 preferences=preferences,
                 user_profile=user_profile,
                 session_info=session_info,
+                language=language,
             )
             return instructions
         except Exception as e:

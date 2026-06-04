@@ -633,6 +633,7 @@ return secondary_domain as null."""
         session_notes: str = "",
         messages: List[Dict[str, Any]] = None,
         user_name: str = "",
+        language: str = 'en',
     ) -> Tuple[str, str]:
         """Build the canonical shared Career & Degree Selection instructions.
 
@@ -652,6 +653,13 @@ return secondary_domain as null."""
             messages=messages,
         )
 
+        if language == 'hi':
+            static_prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including questions and acknowledgments, "
+                "must be written in clear, warm, and natural Devanagari Hindi text. Keep the question under 25 words.]"
+            )
+
         return static_prompt, dynamic_context
 
     def _build_enhanced_system_prompt(
@@ -664,6 +672,7 @@ return secondary_domain as null."""
         debug_label: str = "ENHANCED SYSTEM PROMPT",
         messages: List[Dict[str, Any]] = None,
         user_name: str = "",
+        language: str = 'en',
     ) -> Tuple[str, str]:
         """
         Build system prompt with user profile formatted in, plus a
@@ -692,6 +701,7 @@ return secondary_domain as null."""
             session_notes=session_notes,
             messages=messages,
             user_name=user_name,
+            language=language,
         )
 
     def _build_dynamic_context(
@@ -980,6 +990,7 @@ Generate the coaching notes:"""
         domain_context: Dict[str, Any] = None,
         step: int = 0,
         user_response: str = "",
+        language: str = 'en',
     ) -> str:
         """Build the shared text-generation prompt for Q1 or Q2."""
         payload = self.build_domain_selection_payload(
@@ -992,7 +1003,7 @@ Generate the coaching notes:"""
             numbered_remaining = payload['secondary_options']
             none_option_number = payload['none_option_number']
 
-            return f"""The student named {user_name} just selected their PRIMARY domain in Q1. Their response was: "{user_response}"
+            prompt = f"""The student named {user_name} just selected their PRIMARY domain in Q1. Their response was: "{user_response}"
 
 Now generate Q2: Ask if there's another domain they also relate to.
 
@@ -1012,9 +1023,9 @@ CRITICAL REQUIREMENTS:
 
 Generate your response now:"""
 
-        if has_domain_results:
+        elif has_domain_results:
             numbered_top_domains = payload['primary_options']
-            return f"""Generate a warm, personalized opening message for a student named {user_name} who has just completed their Stream & Subject Selection session.
+            prompt = f"""Generate a warm, personalized opening message for a student named {user_name} who has just completed their Stream & Subject Selection session.
 
 TOP DOMAIN RECOMMENDATIONS (show ALL with percentage matches):
 {numbered_top_domains}
@@ -1031,8 +1042,9 @@ CRITICAL REQUIREMENTS:
 
 Generate your personalized opening:"""
 
-        print("⚠️ No domain results available for initial question generation.")
-        return f"""Generate a warm, personalized opening message for a student named {user_name} who is about to start their Career & Degree Selection journey.
+        else:
+            print("⚠️ No domain results available for initial question generation.")
+            prompt = f"""Generate a warm, personalized opening message for a student named {user_name} who is about to start their Career & Degree Selection journey.
 
 RULES:
 - Start with a warm greeting using their name
@@ -1045,6 +1057,14 @@ RULES:
 
 Generate your personalized opening:"""
 
+        if language == 'hi':
+            prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST generate this response in Hindi using Devanagari script only. "
+                "Translate the greeting/acknowledgment, instructions and options into natural and warm Devanagari Hindi. "
+                "Ensure NO English letters or Hinglish is used. Keep the message concise (under 80 words for the main body).]"
+            )
+        return prompt
+
     # ================== Unified Prompt Builder ==================
 
     def build_prompt_for_step(
@@ -1056,6 +1076,7 @@ Generate your personalized opening:"""
         user_name: str = "there",
         domain_context: Dict[str, Any] = None,
         session_notes: str = "",
+        language: str = 'en',
     ) -> Dict[str, Any]:
         """Build prompt content for any question number.
 
@@ -1104,6 +1125,7 @@ Generate your personalized opening:"""
             session_notes=session_notes,
             messages=messages,
             user_name=user_name,
+            language=language,
         )
 
         # Domain selection is now handled before the session starts,
@@ -1154,6 +1176,7 @@ Generate your personalized opening:"""
         messages: List[Dict[str, Any]] = None,
         user_name: str = "there",
         domain_context: Dict[str, Any] = None,
+        language: str = 'en',
     ) -> list:
         """Assemble the LangChain message list for an LLM call.
 
@@ -1204,12 +1227,15 @@ Generate your personalized opening:"""
         else:
             step_instruction = self._build_domain_career_focus(domain_context, messages)
 
-            llm_messages.append(HumanMessage(content=f"""{user_response}
+            content_str = f"""{user_response}
 
 1. Ask exactly ONE focused question that probes a SINGLE dimension or preference.
 2. Do NOT ask multi-part questions.
 {step_instruction}
-Generate your response now:"""))
+Generate your response now:"""
+            if language == 'hi':
+                content_str += "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. Keep it natural and warm.]"
+            llm_messages.append(HumanMessage(content=content_str))
 
         return llm_messages
 
@@ -1223,6 +1249,7 @@ Generate your response now:"""))
         domain_context: Dict[str, Any] = None,
         session_notes: str = "",
         token_usage: Dict = None,
+        language: str = 'en',
     ) -> str:
         """Generate a question for any step number.
 
@@ -1244,6 +1271,7 @@ Generate your response now:"""))
                 user_name=user_name,
                 domain_context=domain_context,
                 session_notes=session_notes,
+                language=language,
             )
 
             llm_messages = self._build_llm_messages(
@@ -1252,6 +1280,7 @@ Generate your response now:"""))
                 messages=messages,
                 user_name=user_name,
                 domain_context=domain_context,
+                language=language,
             )
 
             response = self.llm.invoke(llm_messages)
@@ -1277,7 +1306,7 @@ Generate your response now:"""))
             logger.error(f"Error generating question at step {step}: {e}", exc_info=True)
             raise
 
-    def generate_initial_question(self, user_name: str = "there", user_profile: Dict[str, Any] = None, domain_context: Dict[str, Any] = None, session_notes: str = "", token_usage: Dict = None, step: int = 0, user_response: str = "") -> str:
+    def generate_initial_question(self, user_name: str = "there", user_profile: Dict[str, Any] = None, domain_context: Dict[str, Any] = None, session_notes: str = "", token_usage: Dict = None, step: int = 0, user_response: str = "", language: str = 'en') -> str:
         """Generate the first or second question (domain selection) to start the conversation.
         
         Args:
@@ -1291,6 +1320,7 @@ Generate your response now:"""))
                 session_notes=session_notes,
                 debug_label=f"ENHANCED SYSTEM PROMPT (generate_initial_question step={step})",
                 user_name=user_name,
+                language=language,
             )
 
             messages = [
@@ -1301,6 +1331,7 @@ Generate your response now:"""))
                     domain_context=domain_context,
                     step=step,
                     user_response=user_response,
+                    language=language,
                 ))
             ]
 
@@ -1331,6 +1362,7 @@ Generate your response now:"""))
         session_notes: str = "",
         token_usage: Dict = None,
         user_name: str = "",
+        language: str = 'en',
     ) -> str:
         """Generate the next question based on conversation context and agent evaluation needs"""
         try:
@@ -1355,6 +1387,7 @@ For this step, consider asking questions that help evaluate:
                 debug_label="ENHANCED SYSTEM PROMPT (generate_next_question)",
                 messages=messages,
                 user_name=user_name,
+                language=language,
             )
             
             # Build langchain messages with cache-optimized structure:

@@ -568,6 +568,81 @@ class SettingsView(UserDTOView):
         # Merge incoming keys into existing settings
         user.settings.update(request.data)
         user.save(update_fields=["settings", "updated_at"])
+
+        # Check and update the first bot message of active, unstarted sessions if voice_language or voice_persona was updated:
+        if 'voice_language' in request.data or 'voice_persona' in request.data:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # 1. Domain Discovery
+            try:
+                from domain_discovery.models import DomainSession, DomainMessage
+                from domain_discovery.services import DOMAIN_INTRO_MESSAGE, DOMAIN_INTRO_MESSAGE_HI_MALE, DOMAIN_INTRO_MESSAGE_HI_FEMALE
+                
+                active_domain_sess = DomainSession.objects.filter(user=user, is_active=True).order_by('-created_at').first()
+                if active_domain_sess and not active_domain_sess.is_completed:
+                    user_msgs_count = DomainMessage.objects.filter(session=active_domain_sess, type='user').count()
+                    if user_msgs_count == 0:
+                        first_msg = DomainMessage.objects.filter(session=active_domain_sess, type='bot').order_by('timestamp').first()
+                        if first_msg:
+                            lang = user.settings.get('voice_language', 'en').lower()
+                            persona = user.settings.get('voice_persona', 'male').lower()
+                            if lang == 'hi':
+                                new_content = DOMAIN_INTRO_MESSAGE_HI_FEMALE if persona == 'female' else DOMAIN_INTRO_MESSAGE_HI_MALE
+                            else:
+                                new_content = DOMAIN_INTRO_MESSAGE
+                            first_msg.content = new_content
+                            first_msg.save(update_fields=['content'])
+            except Exception as e:
+                logger.error(f"Error updating domain intro message on settings change: {e}")
+
+            # 2. Career Discovery
+            try:
+                from career_discovery.models import CareerSession, CareerMessage
+                from career_discovery.services import build_career_intro_message
+                from utils.user_helpers import get_user_display_name
+                
+                active_career_sess = CareerSession.objects.filter(user=user, is_active=True).order_by('-created_at').first()
+                if active_career_sess and not active_career_sess.is_completed:
+                    user_msgs_count = CareerMessage.objects.filter(session=active_career_sess, type='user').count()
+                    if user_msgs_count == 0:
+                        first_msg = CareerMessage.objects.filter(session=active_career_sess, type='bot').order_by('timestamp').first()
+                        if first_msg:
+                            lang = user.settings.get('voice_language', 'en').lower()
+                            metadata = active_career_sess.metadata or {}
+                            domain_choices = metadata.get('domain_choices', {})
+                            primary_domain = domain_choices.get('primary_domain')
+                            secondary_domain = domain_choices.get('secondary_domain')
+                            user_name = get_user_display_name(None, user, 'there')
+                            new_content = build_career_intro_message(
+                                user_name=user_name,
+                                primary_domain=primary_domain,
+                                secondary_domain=secondary_domain,
+                                language=lang
+                            )
+                            first_msg.content = new_content
+                            first_msg.save(update_fields=['content'])
+            except Exception as e:
+                logger.error(f"Error updating career intro message on settings change: {e}")
+
+            # 3. College Selector
+            try:
+                from college_selector.models import CollegeSelectorSession, CollegeSelectorMessage
+                from college_selector.services import build_intro_message
+                
+                active_college_sess = CollegeSelectorSession.objects.filter(user=user, is_active=True).order_by('-created_at').first()
+                if active_college_sess and not active_college_sess.is_completed:
+                    user_msgs_count = CollegeSelectorMessage.objects.filter(session=active_college_sess, type='user').count()
+                    if user_msgs_count == 0:
+                        first_msg = CollegeSelectorMessage.objects.filter(session=active_college_sess, type='bot').order_by('timestamp').first()
+                        if first_msg:
+                            lang = user.settings.get('voice_language', 'en').lower()
+                            new_content = build_intro_message(user, active_college_sess.preferences, language=lang)
+                            first_msg.content = new_content
+                            first_msg.save(update_fields=['content'])
+            except Exception as e:
+                logger.error(f"Error updating college selector intro message on settings change: {e}")
+
         return Response({"settings": user.settings}, status=200)
 
 
