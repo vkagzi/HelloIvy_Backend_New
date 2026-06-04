@@ -112,36 +112,27 @@ def cities(request):
     
     # Filter by country if provided
     if country:
-        country_ascii = unidecode(country).lower()
-        all_locations = qs.all()
-        qs = Location.objects.filter(
-            id__in=[loc.id for loc in all_locations if unidecode(loc.country).lower() == country_ascii]
-        )
+        # Use database-level filter for better performance
+        # We try exact match first, then icontains if no exact match or if user is searching
+        qs = qs.filter(country__icontains=country)
     
     # Filter by state if provided
     if state:
-        state_ascii = unidecode(state).lower()
-        all_locations = qs.all()
-        qs = Location.objects.filter(
-            id__in=[loc.id for loc in all_locations if loc.state and unidecode(loc.state).lower() == state_ascii]
-        )
+        qs = qs.filter(state__icontains=state)
     
-    if q and len(q) >= 2:
-        # Use initial database-level filter for performance
-        qs = qs.filter(city__icontains=q)
-        
-        # Then refine in-memory for unidecode matches if needed
-        # (Optional: Only if initial check didn't catch enough or if we want exact unidecode parity)
-        q_ascii = unidecode(q).lower()
-        all_locations = list(qs[:200]) # Limit refined search to 200 items for speed
-        matching_ids = [loc.id for loc in all_locations if q_ascii in unidecode(loc.city).lower()]
-        
-        # If we found matches via unidecode that were not in initial qs, 
-        # we might want to be more broad, but let's stick to simple DB filter for now.
-        qs = Location.objects.filter(id__in=matching_ids)
+    if q and len(q) >= 1:
+        # Use istartswith for prefix matching (leverages index on city)
+        # If no results, fallback to icontains
+        qs_prefix = qs.filter(city__istartswith=q)
+        if qs_prefix.exists():
+            qs = qs_prefix
+        else:
+            qs = qs.filter(city__icontains=q)
     
-    # Return formatted "City, State, Country" strings
-    locations = qs[:limit]
+    # Return formatted "City, State, Country" strings directly from DB QuerySet
+    # Limit early to avoid large data transfers
+    locations = qs.order_by("city")[:limit]
+    
     formatted_cities = []
     seen = set()
     
@@ -150,15 +141,15 @@ def cities(request):
         state_ascii = unidecode(loc.state) if loc.state else None
         country_ascii = unidecode(loc.country)
         
-        # Format: "City, State, Country" or "City, Country" if no state
         if state_ascii:
             formatted = f"{city_ascii}, {state_ascii}, {country_ascii}"
         else:
             formatted = f"{city_ascii}, {country_ascii}"
         
-        # Deduplicate
         if formatted not in seen:
             seen.add(formatted)
             formatted_cities.append(formatted)
+            if len(formatted_cities) >= limit:
+                break
     
-    return Response(sorted(formatted_cities))
+    return Response(formatted_cities)
