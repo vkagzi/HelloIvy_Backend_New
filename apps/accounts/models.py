@@ -551,9 +551,12 @@ class ActivityLog(models.Model):
         if request:
             x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
             if x_forwarded_for:
-                ip_address = x_forwarded_for.split(',')[0]
+                ip_address = x_forwarded_for.split(',')[0].strip()
             else:
-                ip_address = request.META.get('REMOTE_ADDR')
+                ip_address = request.META.get('REMOTE_ADDR', '')
+            # Strip port if present (e.g. Azure App Service returns "1.2.3.4:56789")
+            if ip_address and ':' in ip_address and ip_address.count(':') == 1:
+                ip_address = ip_address.split(':')[0]
         
         return ActivityLog.objects.create(
             user=user,
