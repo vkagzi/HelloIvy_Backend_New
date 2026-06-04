@@ -87,6 +87,9 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         # Selected accent preference
         self.accent = None
         
+        # Selected language preference (e.g. 'en', 'hi')
+        self.language = 'en'
+        
         # Silent reconnection tracking
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 2
@@ -342,8 +345,34 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         "as if the conversation never paused or changed context.]"
     )
 
+    def get_voice_style_directive(self) -> str:
+        """Return the voice style directive, tailored for language settings."""
+        if getattr(self, 'language', 'en') == 'hi':
+            return (
+                "\n\n[Voice Style Consistency: Throughout the remainder of this conversation, you MUST speak in Hindi. "
+                "Ignore any previous instructions to speak or maintain voice style in English. You must transition "
+                "to speaking in warm, natural, and friendly Hindi immediately. "
+                "Ensure your text transcript output is always in Hindi (Devanagari script). "
+                "Maintain a consistent tone, pacing, energy level, and warmth at all times in Hindi.]"
+            )
+        return self.VOICE_STYLE_DIRECTIVE
+
     def get_accent_directive(self) -> str:
-        """Return the appropriate system instruction directive for the requested accent."""
+        """Return the appropriate system instruction directive for the requested accent/language."""
+        if getattr(self, 'language', 'en') == 'hi':
+            voice = self.get_voice()
+            gender_directive = (
+                "You are a female Hindi-speaking counselor. You MUST speak and write using feminine grammatical forms in Hindi "
+                "(e.g., use 'करूँगी' instead of 'करूँगा', and 'मार्गदर्शिका' instead of 'मार्गदर्शक')."
+            ) if voice == 'marin' else (
+                "You are a male Hindi-speaking counselor. You MUST speak and write using masculine grammatical forms in Hindi "
+                "(e.g., use 'करूँगा' instead of 'करूँगी', and 'मार्गदर्शक' instead of 'मार्गदर्शिका')."
+            )
+            return (
+                f"\n\n[Language and Transcript Directive: {gender_directive} You MUST converse with the student in Hindi. "
+                "Speak in clear, natural, and warm Hindi. Both your spoken audio and your text transcript MUST be in Hindi (using Devanagari script). "
+                "The student will also speak and type in Hindi. Your responses, transcriptions, and all messages in the chatbox must be written strictly in Hindi (Devanagari script) - do not use English translation or Hinglish.]"
+            )
         accent = getattr(self, 'accent', None)
         if accent == 'indian':
             return (
@@ -372,9 +401,14 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         try:
             logger.info(f"⚙️ Configuring session for {self.session_id} (accent: {getattr(self, 'accent', 'None')})")
             instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
-            instructions += self.VOICE_STYLE_DIRECTIVE
+            instructions += self.get_voice_style_directive()
             logger.info(f"📝 Got instructions (length: {len(instructions)} chars)")
             
+            from django.conf import settings
+            transcription_model = "gpt-4o-transcribe"
+            if not self._use_openai_direct:
+                transcription_model = getattr(settings, 'AZURE_OPENAI_WHISPER_DEPLOYMENT', 'whisper')
+
             session_config = {
                 "type": "session.update",
                 "session": {
@@ -384,8 +418,8 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
                     "input_audio_transcription": {
-                        "model": "gpt-4o-transcribe",
-                        "language": "en",
+                        "model": transcription_model,
+                        "language": getattr(self, 'language', 'en'),
                     },
                     "input_audio_noise_reduction": self.get_noise_reduction_config(),
                     "turn_detection": self.get_turn_detection_config(),

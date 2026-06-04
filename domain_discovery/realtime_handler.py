@@ -87,6 +87,13 @@ class DomainDiscoveryHandler(BaseFeatureHandler):
         try:
             from domain_discovery.langchain_service import domain_langchain_service
 
+            # Fetch language from settings
+            from utils.user_helpers import get_user_instance
+            user_instance = get_user_instance(user)
+            language = 'en'
+            if user_instance and hasattr(user_instance, 'settings') and isinstance(user_instance.settings, dict):
+                language = user_instance.settings.get('voice_language', 'en').lower()
+
             if not context:
                 try:
                     prompt_data = domain_langchain_service.build_prompt_for_step(
@@ -95,6 +102,7 @@ class DomainDiscoveryHandler(BaseFeatureHandler):
                         min_questions=10,
                         max_questions=20,
                         session_notes="",
+                        language=language,
                     )
                     return prompt_data["system_prompt"]
                 except Exception:
@@ -122,6 +130,7 @@ class DomainDiscoveryHandler(BaseFeatureHandler):
                 max_questions=session_info.get('total_steps', 20),
                 session_notes=session_info.get('notes', ''),
                 user_name=first_name,
+                language=language,
             )
             instructions = prompt_data["system_prompt"]
 
@@ -131,21 +140,39 @@ class DomainDiscoveryHandler(BaseFeatureHandler):
             status_line = ''
             if is_concluding:
                 if not pre_final_asked:
-                    status_line = (
-                        '- STATUS: The session evaluation has determined we have gathered enough information. '
-                        'In your NEXT response, ask the student: "It was fantastic talking to you today! '
-                        'Is there one final question you wish to ask before we close our session?" '
-                        'Wait for their response before wrapping up. '
-                        'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
-                    )
+                    if language == 'hi':
+                        status_line = (
+                            '- STATUS: The session evaluation has determined we have gathered enough information. '
+                            'In your NEXT response, ask the student in Devanagari script Hindi: "आज आपसे बात करके बहुत अच्छा लगा! '
+                            'इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?" '
+                            'Wait for their response before wrapping up. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
+                        )
+                    else:
+                        status_line = (
+                            '- STATUS: The session evaluation has determined we have gathered enough information. '
+                            'In your NEXT response, ask the student: "It was fantastic talking to you today! '
+                            'Is there one final question you wish to ask before we close our session?" '
+                            'Wait for their response before wrapping up. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
+                        )
                 else:
-                    status_line = (
-                        '- STATUS: The pre-final question has already been asked. '
-                        'If the student asked a question, answer it briefly and warmly (2-3 sentences). '
-                        'Then wrap up the conversation: thank them for sharing, let them know their '
-                        'personalized domain recommendations are being prepared, and say goodbye. '
-                        'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. The goodbye should feel natural and continuous, not like a different speaker.'
-                    )
+                    if language == 'hi':
+                        status_line = (
+                            '- STATUS: The pre-final question has already been asked. '
+                            'If the student asked a question, answer it briefly and warmly in Devanagari script Hindi (2-3 sentences). '
+                            'Then wrap up the conversation in Devanagari script Hindi: thank them for sharing, let them know their '
+                            'personalized domain recommendations are being prepared, and say goodbye. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
+                        )
+                    else:
+                        status_line = (
+                            '- STATUS: The pre-final question has already been asked. '
+                            'If the student asked a question, answer it briefly and warmly (2-3 sentences). '
+                            'Then wrap up the conversation: thank them for sharing, let them know their '
+                            'personalized domain recommendations are being prepared, and say goodbye. '
+                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. The goodbye should feel natural and continuous, not like a different speaker.'
+                        )
 
             instructions += f"""
 
