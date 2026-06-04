@@ -81,20 +81,7 @@ class DomainSessionCreateView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            # Check profile completion before allowing a domain session
-            # get_user_profile_data enriches with User-model fields (academicLevel, name)
-            profile_data = get_user_profile_data(user)
-            completion_percentage, missing_sections = calculate_profile_completion(profile_data)
-            if completion_percentage < 100:
-                return Response(
-                    {
-                        'error': 'Please complete your profile before starting a Stream & Subject Selection session.',
-                        'completion_percentage': completion_percentage,
-                        'missing_sections': missing_sections,
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
+            # Create a new session
             session = domain_discovery_service.create_session(user=user)
             serializer = DomainSessionSerializer(session)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
