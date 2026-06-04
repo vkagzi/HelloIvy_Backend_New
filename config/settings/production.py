@@ -53,9 +53,6 @@ if env.bool("ENABLE_HSTS", default=False):
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-# Database Connection Pooling
-DATABASES['default']['CONN_MAX_AGE'] = env.int("DB_CONN_MAX_AGE", default=600)
-
 # Logging Configuration - Console only for cloud deployment
 LOGGING = {
     'version': 1,

@@ -113,6 +113,7 @@ DATABASES = {
         default="postgres://localhost/postgres",
     ),
 }
+DATABASES['default']['CONN_MAX_AGE'] = env.int("DB_CONN_MAX_AGE", default=60)
 
 # Supabase connection options
 # DATABASES['default']['OPTIONS'] = {
