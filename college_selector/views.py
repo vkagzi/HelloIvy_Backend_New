@@ -61,42 +61,7 @@ class CollegeSelectorSessionCreateView(APIView):
             if not user:
                 return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Check profile completion (personal + educational only)
-            profile_data = get_user_profile_data(user)
-            completion_percentage, missing_sections = calculate_profile_completion(profile_data)
-            profile_missing = [s for s in missing_sections if s in ('personalDetails', 'educational')]
-            if profile_missing:
-                return Response({
-                    'error': 'Please complete your profile before starting College Selector.',
-                    'completion_percentage': completion_percentage,
-                    'missing_sections': profile_missing,
-                }, status=status.HTTP_403_FORBIDDEN)
-
-            # Check domain discovery and career discovery completion
-            missing_modules = []
-            has_completed_domain = DomainSession.objects.filter(
-                user=user, current_step__gte=models.F('total_steps')
-            ).exists()
-            if not has_completed_domain:
-                missing_modules.append('domain_discovery')
-
-            has_completed_career = CareerSession.objects.filter(
-                user=user, current_step__gte=models.F('total_steps')
-            ).exists()
-            if not has_completed_career:
-                missing_modules.append('career_discovery')
-
-            if missing_modules:
-                labels = {
-                    'domain_discovery': 'Stream & Subject Selection',
-                    'career_discovery': 'Career & Degree Selection',
-                }
-                names = [labels[m] for m in missing_modules]
-                return Response({
-                    'error': f'Please complete {" and ".join(names)} before starting College Selector.',
-                    'missing_modules': missing_modules,
-                }, status=status.HTTP_403_FORBIDDEN)
-
+            # Profile and module completion requirements removed to allow independent module access.
             session = college_selector_service.create_session(user=user)
             serializer = CollegeSelectorSessionSerializer(session)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
