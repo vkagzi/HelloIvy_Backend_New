@@ -1,6 +1,7 @@
 import json
 import io
 import base64
+import os
 from rest_framework.request import Request
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
@@ -63,6 +64,155 @@ client = AzureOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
     api_version="2024-02-15-preview"
 )
+
+ALLOWED_BOARDS = [
+    "American (AP / US High School Diploma)",
+    "Cambridge - A Levels",
+    "Cambridge - IGCSE",
+    "CBSE",
+    "HSC",
+    "ICSE",
+    "International Baccalaureate (IB)",
+    "ISC",
+    "NIOS",
+    "State Board",
+    "Other",
+]
+
+def normalize_board(board_name: str) -> tuple[str, str | None]:
+    """
+    Normalizes board name to match one of the standard options.
+    Returns a tuple: (normalized_board_name, board_other_value)
+    """
+    if not board_name or not isinstance(board_name, str):
+        return "Other", None
+
+    board_clean = board_name.strip()
+
+    # Direct match (case-insensitive)
+    for b in ALLOWED_BOARDS:
+        if b.lower() == board_clean.lower():
+            return b, None
+
+    # Handle abbreviations and variations
+    board_upper = board_clean.upper()
+
+    # 1. International Baccalaureate (IB)
+    if (
+        board_upper in ["IB", "INTERNATIONAL BACCALAUREATE", "INTERNATIONAL BACCALAUREATE (IB)"]
+        or board_upper.startswith("IB-")
+        or board_upper.startswith("IB ")
+        or board_upper.startswith("IBDP")
+        or board_upper.startswith("IBMYP")
+        or "INTERNATIONAL BACCALAUREATE" in board_upper
+    ):
+        return "International Baccalaureate (IB)", None
+
+    # 2. CBSE
+    if (
+        "CBSE" in board_upper
+        or "CENTRAL BOARD" in board_upper
+        or "CENTRALBOARD" in board_upper
+    ):
+        return "CBSE", None
+
+    # 3. ICSE
+    if (
+        "ICSE" in board_upper
+        or "INDIAN CERTIFICATE OF SECONDARY EDUCATION" in board_upper
+    ):
+        return "ICSE", None
+
+    # 4. ISC
+    if (
+        "ISC" in board_upper
+        or "INDIAN SCHOOL CERTIFICATE" in board_upper
+    ):
+        return "ISC", None
+
+    # 5. NIOS
+    if (
+        "NIOS" in board_upper
+        or "NATIONAL INSTITUTE OF OPEN" in board_upper
+        or "NATIONAL INSTITUTE OF OPEN SCHOOLING" in board_upper
+    ):
+        return "NIOS", None
+
+    # 6. HSC
+    if (
+        "HSC" in board_upper
+        or "HIGHER SECONDARY CERTIFICATE" in board_upper
+        or "HIGHER SECONDARY SCHOOL" in board_upper
+    ):
+        # Prevent false positives with state board names that might contain HSC as a substring or suffix,
+        # but HSC itself is a standard dropdown option
+        return "HSC", None
+
+    # 7. Cambridge - IGCSE & A Levels
+    if "IGCSE" in board_upper:
+        return "Cambridge - IGCSE", None
+    if (
+        "A LEVEL" in board_upper 
+        or "A-LEVEL" in board_upper
+        or "A_LEVEL" in board_upper
+    ):
+        return "Cambridge - A Levels", None
+    if "CAMBRIDGE" in board_upper:
+        if "IGCSE" in board_upper:
+            return "Cambridge - IGCSE", None
+        else:
+            return "Cambridge - A Levels", None
+
+    # 8. American (AP / US High School Diploma)
+    if (
+        "AMERICAN" in board_upper
+        or "US HIGH SCHOOL" in board_upper
+        or "US DIPLOMA" in board_upper
+        or "HIGH SCHOOL DIPLOMA" in board_upper
+        or "AMERICAN DIPLOMA" in board_upper
+        or "ADVANCED PLACEMENT" in board_upper
+        or board_upper == "AP"
+        or " AP " in board_upper
+        or board_upper.startswith("AP ")
+        or board_upper.endswith(" AP")
+        or board_upper.startswith("AP-")
+    ):
+        return "American (AP / US High School Diploma)", None
+
+    # 9. State Board
+    # Check common state names or abbreviations
+    state_keywords = [
+        "STATE", "BOARD OF SECONDARY", "BOARD OF INTERMEDIATE", "SECONDARY SCHOOL EDUCATION",
+        "MAHARASHTRA", "GUJARAT", "KARNATAKA", "TAMIL NADU", "ANDHRA", "TELANGANA",
+        "UTTAR PRADESH", "PUNJAB", "HARYANA", "BIHAR", "WEST BENGAL", "RAJASTHAN",
+        "MADHYA PRADESH", "KERALA", "DELHI STATE", "GOA", "UPMSP", "GSEB", "MSBSHSE",
+        "KSEEB", "BSEB", "WBBSE", "BSER", "MPBSE", "DHSE", "BIEAP", "BSEAP", "TSBIE"
+    ]
+    if any(keyword in board_upper for keyword in state_keywords):
+        return "State Board", None
+
+    # If no mapping was successful, return 'Other' and the original name for boardOther
+    return "Other", board_clean
+
+
+def normalize_boards_in_data(data):
+    """
+    Recursively updates dictionary objects containing the 'board' key
+    by running them through normalize_board.
+    """
+    if isinstance(data, dict):
+        new_data = {k: normalize_boards_in_data(v) for k, v in data.items()}
+        if 'board' in new_data and isinstance(new_data['board'], str):
+            normalized, board_other = normalize_board(new_data['board'])
+            new_data['board'] = normalized
+            if board_other:
+                if not new_data.get('boardOther'):
+                    new_data['boardOther'] = board_other
+        return new_data
+    elif isinstance(data, list):
+        return [normalize_boards_in_data(item) for item in data]
+    else:
+        return data
 
 # Initialize EasyOCR reader once at startup (or lazily) to avoid per-request latency
 _EASYOCR_READER = None
@@ -398,7 +548,19 @@ STRICT RULES:
 8. HIGH SCHOOL DATA: For each High School record:
    - Set `academicLevel` to exactly "High School (8th–12th grade)".
    - Set `gradeLevel` to the NUMERIC grade only (e.g. 12 for "12th grade" or "Grade 12", 10 for "10th grade"). Do NOT include any text suffix.
-   - Extract `board` (e.g. CBSE, ICSE, ISC, IB).
+   - Extract `board`. Ground/map this strictly to the board type dropdown options. Output EXACTLY one of:
+     * "American (AP / US High School Diploma)"
+     * "Cambridge - A Levels"
+     * "Cambridge - IGCSE"
+     * "CBSE"
+     * "HSC"
+     * "ICSE"
+     * "International Baccalaureate (IB)" (e.g. if the transcript says "IB" or "International Baccalaureate", you must output "International Baccalaureate (IB)")
+     * "ISC"
+     * "NIOS"
+     * "State Board" (use this for all state boards, e.g. MSBSHSE, Maharashtra Board, etc.)
+     * "Other"
+     If you map it to "Other", fill in the original board name in the `boardOther` field.
    - Extract `overallPercentage` as the overall/aggregate percentage or score (a plain number, NO % symbol). If per-subject scores are given and no aggregate is stated, leave it empty.
    - Extract all `subjects` with their scores.
 9. SUBJECTS: For each subject, extract the name, level (if any), marks obtained (yourTotalScore as a plain number, NO % symbol), and maximum possible marks (highestTotalScore, also a plain number e.g. 100).
@@ -435,6 +597,7 @@ JSON STRUCTURE:
        "overallPercentage": "", "maximumPossibleGPA": "",
        "degree": "", "major": "", "startYear": "YYYY", "endYear": "YYYY",
        "board": "",
+       "boardOther": "",
        "subjects": [
           {{ "subject": "", "level": "", "yourTotalScore": "", "highestTotalScore": "100" }}
        ]
@@ -510,8 +673,9 @@ Document content:
                 print(f"Failed to save AI response to scratch: {save_err}")
                 
             parsed = json.loads(content)
-            # Sanitize years before returning
+            # Sanitize years and ground board names before returning
             parsed = sanitize_years(parsed)
+            parsed = normalize_boards_in_data(parsed)
             print(f"Successfully parsed AI response with keys: {list(parsed.keys())}")
         except Exception as e:
             import traceback
