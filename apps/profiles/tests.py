@@ -1,5 +1,11 @@
 from django.test import TestCase
-from apps.profiles.views import normalize_board, normalize_boards_in_data
+from apps.profiles.views import (
+    normalize_board,
+    normalize_degree,
+    normalize_test_type,
+    normalize_level,
+    normalize_grounded_dropdowns
+)
 
 class BoardNormalizationTestCase(TestCase):
     def test_normalize_board_direct_match(self):
@@ -94,8 +100,25 @@ class BoardNormalizationTestCase(TestCase):
         self.assertEqual(val, "State Board")
         self.assertIsNone(other)
 
+        # Test MYP
+        val, other = normalize_board("MYP")
+        self.assertEqual(val, "MYP")
+        self.assertIsNone(other)
+
+        val, other = normalize_board("IB MYP")
+        self.assertEqual(val, "MYP")
+        self.assertIsNone(other)
+
+        # Test IBCP
+        val, other = normalize_board("IBCP")
+        self.assertEqual(val, "IBCP")
+        self.assertIsNone(other)
+
+        val, other = normalize_board("IB-CP")
+        self.assertEqual(val, "IBCP")
+        self.assertIsNone(other)
+
     def test_normalize_board_other(self):
-        # Unrecognized boards should return 'Other' and the original string as other
         val, other = normalize_board("My Custom Board Name")
         self.assertEqual(val, "Other")
         self.assertEqual(other, "My Custom Board Name")
@@ -104,45 +127,87 @@ class BoardNormalizationTestCase(TestCase):
         self.assertEqual(val, "Other")
         self.assertIsNone(other)
 
-    def test_normalize_boards_in_data_recursive(self):
-        # Test full recursive normalization in nested structure
+    def test_normalize_degree(self):
+        val, other = normalize_degree("BTech")
+        self.assertEqual(val, "B.T. (Bachelor of Technology)")
+        self.assertIsNone(other)
+
+        val, other = normalize_degree("Bachelor of Business Administration")
+        self.assertEqual(val, "B.B.A. (Bachelor of Business Administration)")
+        self.assertIsNone(other)
+
+        val, other = normalize_degree("MBA")
+        self.assertEqual(val, "M.B.A. (Master of Business Administration)")
+        self.assertIsNone(other)
+
+        val, other = normalize_degree("Random Custom Degree")
+        self.assertEqual(val, "Other")
+        self.assertEqual(other, "Random Custom Degree")
+
+    def test_normalize_test_type(self):
+        val, other = normalize_test_type("EA")
+        self.assertEqual(val, "Executive Assessment")
+        self.assertIsNone(other)
+
+        val, other = normalize_test_type("gmat focus")
+        self.assertEqual(val, "GMAT")
+        self.assertIsNone(other)
+
+        val, other = normalize_test_type("Something Else")
+        self.assertEqual(val, "Other")
+        self.assertEqual(other, "Something Else")
+
+    def test_normalize_level(self):
+        self.assertEqual(normalize_level("AS"), "AS Level")
+        self.assertEqual(normalize_level("HL"), "Higher")
+        self.assertEqual(normalize_level("unknown"), "Not Applicable")
+
+    def test_normalize_grounded_dropdowns_recursive(self):
         input_data = {
-            "personalDetails": {"firstName": "Abhay"},
             "educational": [
                 {
-                    "academicLevel": "High School (8th–12th grade)",
-                    "board": "IB",
+                    "board": "IB-DP",
+                    "degree": "BTech"
                 },
                 {
-                    "academicLevel": "High School (8th–12th grade)",
-                    "board": "Maharashtra State Board",
-                },
+                    "board": "IB-MYP",
+                    "degree": "MBA"
+                }
+            ],
+            "testScores": [
                 {
-                    "academicLevel": "High School (8th–12th grade)",
-                    "board": "Some Unknown Board",
+                    "testType": "EA"
+                }
+            ],
+            "subjects": [
+                {
+                    "level": "HL"
                 }
             ]
         }
         
         expected_data = {
-            "personalDetails": {"firstName": "Abhay"},
             "educational": [
                 {
-                    "academicLevel": "High School (8th–12th grade)",
                     "board": "International Baccalaureate (IB)",
+                    "degree": "B.T. (Bachelor of Technology)"
                 },
                 {
-                    "academicLevel": "High School (8th–12th grade)",
-                    "board": "State Board",
-                },
+                    "board": "MYP",
+                    "degree": "M.B.A. (Master of Business Administration)"
+                }
+            ],
+            "testScores": [
                 {
-                    "academicLevel": "High School (8th–12th grade)",
-                    "board": "Other",
-                    "boardOther": "Some Unknown Board",
+                    "testType": "Executive Assessment"
+                }
+            ],
+            "subjects": [
+                {
+                    "level": "Higher"
                 }
             ]
         }
         
-        normalized = normalize_boards_in_data(input_data)
+        normalized = normalize_grounded_dropdowns(input_data)
         self.assertEqual(normalized, expected_data)
-

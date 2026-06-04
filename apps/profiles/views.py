@@ -71,9 +71,11 @@ ALLOWED_BOARDS = [
     "Cambridge - IGCSE",
     "CBSE",
     "HSC",
+    "IBCP",
     "ICSE",
     "International Baccalaureate (IB)",
     "ISC",
+    "MYP",
     "NIOS",
     "State Board",
     "Other",
@@ -97,13 +99,18 @@ def normalize_board(board_name: str) -> tuple[str, str | None]:
     # Handle abbreviations and variations
     board_upper = board_clean.upper()
 
-    # 1. International Baccalaureate (IB)
+    # 1. Handle MYP and IBCP first
+    if board_upper in ["MYP", "IB-MYP", "IB MYP", "IBMYP"]:
+        return "MYP", None
+    if board_upper in ["IBCP", "IB-CP", "IB CP", "IBCP"]:
+        return "IBCP", None
+
+    # 2. International Baccalaureate (IB)
     if (
         board_upper in ["IB", "INTERNATIONAL BACCALAUREATE", "INTERNATIONAL BACCALAUREATE (IB)"]
         or board_upper.startswith("IB-")
         or board_upper.startswith("IB ")
         or board_upper.startswith("IBDP")
-        or board_upper.startswith("IBMYP")
         or "INTERNATIONAL BACCALAUREATE" in board_upper
     ):
         return "International Baccalaureate (IB)", None
@@ -195,22 +202,297 @@ def normalize_board(board_name: str) -> tuple[str, str | None]:
     return "Other", board_clean
 
 
-def normalize_boards_in_data(data):
+def normalize_degree(degree_name: str) -> tuple[str, str | None]:
+    if not degree_name or not isinstance(degree_name, str):
+        return "Other", None
+    
+    deg_clean = degree_name.strip()
+    
+    # Direct match (case-insensitive)
+    for d in ALLOWED_DEGREES:
+        if d.lower() == deg_clean.lower():
+            return d, None
+            
+    # Abbreviation checks
+    deg_upper = deg_clean.upper().replace(".", "") # Remove dots for easy match like B.Tech -> BTech
+    
+    # Common mappings
+    # Undergrad
+    if deg_upper in ["BA", "BACHELOR OF ARTS"]:
+        return "B.A. (Bachelor of Arts)", None
+    if deg_upper in ["BARCH", "BACHELOR OF ARCHITECTURE"]:
+        return "B.Arch (Bachelor of Architecture)", None
+    if deg_upper in ["BBA", "BACHELOR OF BUSINESS ADMINISTRATION", "BACHELOR OF BUSINESS"]:
+        return "B.B.A. (Bachelor of Business Administration)", None
+    if deg_upper in ["BCA", "BACHELOR OF COMPUTER APPLICATIONS", "BACHELOR OF COMPUTER APPLICATION"]:
+        return "B.C.A. (Bachelor of Computer Applications)", None
+    if deg_upper in ["BCOM", "BACHELOR OF COMMERCE"]:
+        return "B.Com (Bachelor of Commerce)", None
+    if deg_upper in ["BDS", "BACHELOR OF DENTAL SURGERY"]:
+        return "B.D.S. (Bachelor of Dental Surgery)", None
+    if deg_upper in ["BDES", "BACHELOR OF DESIGN"]:
+        return "B.Des (Bachelor of Design)", None
+    if deg_upper in ["BE", "BACHELOR OF ENGINEERING"]:
+        return "B.E. (Bachelor of Engineering)", None
+    if deg_upper in ["BED", "BACHELOR OF EDUCATION"]:
+        return "B.Ed (Bachelor of Education)", None
+    if deg_upper in ["BFA", "BACHELOR OF FINE ARTS"]:
+        return "B.F.A. (Bachelor of Fine Arts)", None
+    if deg_upper in ["BJ", "BACHELOR OF JOURNALISM"]:
+        return "B.J. (Bachelor of Journalism)", None
+    if deg_upper in ["LLB", "BL", "BACHELOR OF LAWS", "BACHELOR OF LAW"]:
+        return "B.L.L.B. (Bachelor of Laws)", None
+    if deg_upper in ["MBBS", "BACHELOR OF MEDICINE"]:
+        return "B.M.B.B.S. (Bachelor of Medicine & Surgery)", None
+    if deg_upper in ["BSC", "BACHELOR OF SCIENCE"]:
+        return "B.Sc (Bachelor of Science)", None
+    if deg_upper in ["BTECH", "BT", "BACHELOR OF TECHNOLOGY"]:
+        return "B.T. (Bachelor of Technology)", None
+        
+    # Postgrad
+    if deg_upper in ["LLM", "MASTER OF LAWS", "MASTER OF LAW"]:
+        return "LL.M. (Master of Laws)", None
+    if deg_upper in ["MA", "MASTER OF ARTS"]:
+        return "M.A. (Master of Arts)", None
+    if deg_upper in ["MARCH", "MASTER OF ARCHITECTURE"]:
+        return "M.Arch (Master of Architecture)", None
+    if deg_upper in ["MBA", "MASTER OF BUSINESS ADMINISTRATION"]:
+        return "M.B.A. (Master of Business Administration)", None
+    if deg_upper in ["MCA", "MASTER OF COMPUTER APPLICATIONS", "MASTER OF COMPUTER APPLICATION"]:
+        return "M.C.A. (Master of Computer Applications)", None
+    if deg_upper in ["MCOM", "MASTER OF COMMERCE"]:
+        return "M.Com (Master of Commerce)", None
+    if deg_upper in ["MDS", "MASTER OF DENTAL SURGERY"]:
+        return "M.D.S. (Master of Dental Surgery)", None
+    if deg_upper in ["MDES", "MASTER OF DESIGN"]:
+        return "M.Des (Master of Design)", None
+    if deg_upper in ["ME", "MASTER OF ENGINEERING"]:
+        return "M.E. (Master of Engineering)", None
+    if deg_upper in ["MED", "MASTER OF EDUCATION"]:
+        return "M.Ed (Master of Education)", None
+    if deg_upper in ["MFA", "MASTER OF FINE ARTS"]:
+        return "M.F.A. (Master of Fine Arts)", None
+    if deg_upper in ["MPT", "MASTER OF PHYSIOTHERAPY"]:
+        return "M.P.T. (Master of Physiotherapy)", None
+    if deg_upper in ["MSW", "MASTER OF SOCIAL WORK"]:
+        return "M.S.W. (Master of Social Work)", None
+    if deg_upper in ["MSC", "MS", "MASTER OF SCIENCE"]:
+        return "Master of Science (MS / MSc)", None
+    if deg_upper in ["MTECH", "MASTER OF TECHNOLOGY"]:
+        return "M.Tech (Master of Technology)", None
+    if deg_upper in ["PHD", "DOCTOR OF PHILOSOPHY"]:
+        return "Ph.D. (Doctor of Philosophy)", None
+    if deg_upper in ["MD", "DOCTOR OF MEDICINE"]:
+        return "M.D. (Doctor of Medicine)", None
+
+    return "Other", deg_clean
+
+ALLOWED_DEGREES = [
+    # Undergraduate
+    "B.A. (Bachelor of Arts)",
+    "B.Arch (Bachelor of Architecture)",
+    "B.B.A. (Bachelor of Business Administration)",
+    "B.C.A. (Bachelor of Computer Applications)",
+    "B.Com (Bachelor of Commerce)",
+    "B.D.S. (Bachelor of Dental Surgery)",
+    "B.Des (Bachelor of Design)",
+    "B.E. (Bachelor of Engineering)",
+    "B.Ed (Bachelor of Education)",
+    "B.F.A. (Bachelor of Fine Arts)",
+    "B.J. (Bachelor of Journalism)",
+    "B.L.L.B. (Bachelor of Laws)",
+    "B.M.B.B.S. (Bachelor of Medicine & Surgery)",
+    "B.N. (Bachelor of Nursing)",
+    "B.P.T. (Bachelor of Physiotherapy)",
+    "B.Pharm (Bachelor of Pharmacy)",
+    "B.Sc (Bachelor of Science)",
+    "B.T. (Bachelor of Technology)",
+    "B.V.Sc (Bachelor of Veterinary Science)",
+    
+    # Postgraduate
+    "LL.M. (Master of Laws)",
+    "M.A. (Master of Arts)",
+    "M.Arch (Master of Architecture)",
+    "M.B.A. (Master of Business Administration)",
+    "M.C.A. (Master of Computer Applications)",
+    "M.Com (Master of Commerce)",
+    "M.D.S. (Master of Dental Surgery)",
+    "M.Des (Master of Design)",
+    "M.E. (Master of Engineering)",
+    "M.Ed (Master of Education)",
+    "M.F.A. (Master of Fine Arts)",
+    "M.L.L.B. (Master of Laws)",
+    "M.P.T. (Master of Physiotherapy)",
+    "M.Pharm (Master of Pharmacy)",
+    "M.S.W. (Master of Social Work)",
+    "M.Sc (Master of Science)",
+    "M.Tech (Master of Technology)",
+    "Master of Arts (MA)",
+    "Master of Science (MS / MSc)",
+    "Master of Research (MRes)",
+    "Master of Studies (MSt)",
+    "Master of Liberal Arts (MLA / ALM)",
+    "Master of Interdisciplinary Studies (MIS / MAIS)",
+    "Master of Advanced Study (MAS)",
+    "Master of Applied Science (MASc)",
+    "Executive MBA (EMBA)",
+    "Master in Management (MiM / MIM)",
+    "Master of Finance (MFin / MiF)",
+    "MPhil",
+    "Integrated Master of Engineering (MEng)",
+    "Integrated Master of Science (MSci / MSc)",
+    "BS/MS in Engineering",
+    "BS/MS in Computer Science",
+    "BS/MS in Data Science / AI",
+    "BS/MS in Biotechnology / Life Sciences",
+    "BBA + MBA Integrated Programs",
+    "BS/BA + Master in Management (MiM)",
+    "BA + Master of Public Policy (MPP)",
+    "BA + Master of International Relations",
+    "BA + Master of Public Administration (MPA)",
+    "Integrated Social Sciences Master’s Pathways",
+    "BA/MA in Humanities",
+    "BA/MA in Languages or Literature",
+    "Integrated Liberal Arts Master’s Programs",
+    "Integrated Bachelor + Master of Architecture",
+    "Integrated Design Master’s Programs",
+
+    # Doctorate
+    "Ph.D. (Doctor of Philosophy)",
+    "M.D. (Doctor of Medicine)",
+]
+
+ALLOWED_TEST_TYPES = [
+    "ACT",
+    "Executive Assessment",
+    "GMAT",
+    "GRE",
+    "IELTS",
+    "SAT",
+    "TOEFL",
+    "Other",
+]
+
+def normalize_test_type(test_type: str) -> tuple[str, str | None]:
+    if not test_type or not isinstance(test_type, str):
+        return "Other", None
+    
+    t_clean = test_type.strip()
+    
+    # Direct match (case-insensitive)
+    for t in ALLOWED_TEST_TYPES:
+        if t.lower() == t_clean.lower():
+            return t, None
+            
+    # Abbreviation / common mapping
+    t_upper = t_clean.upper()
+    if t_upper in ["EA", "EXECUTIVE ASSESSMENT"]:
+        return "Executive Assessment", None
+    if "GMAT" in t_upper:
+        return "GMAT", None
+    if "GRE" in t_upper:
+        return "GRE", None
+    if "SAT" in t_upper:
+        return "SAT", None
+    if "ACT" in t_upper:
+        return "ACT", None
+    if "TOEFL" in t_upper:
+        return "TOEFL", None
+    if "IELTS" in t_upper:
+        return "IELTS", None
+        
+    return "Other", t_clean
+
+ALLOWED_LEVELS = [
+    "Not Applicable",
+    "A Level",
+    "AS Level",
+    "AP",
+    "Advanced",
+    "Core",
+    "Extended",
+    "Higher",
+    "Honors",
+    "Standard",
+]
+
+def normalize_level(level_name: str) -> str:
+    if not level_name or not isinstance(level_name, str):
+        return "Not Applicable"
+        
+    lvl_clean = level_name.strip()
+    
+    # Direct match (case-insensitive)
+    for l in ALLOWED_LEVELS:
+        if l.lower() == lvl_clean.lower():
+            return l
+            
+    lvl_upper = lvl_clean.upper()
+    if "NOT APPLICABLE" in lvl_upper or lvl_upper == "NA" or lvl_upper == "N/A" or lvl_upper == "NONE":
+        return "Not Applicable"
+    if lvl_upper in ["AS LEVEL", "AS-LEVEL", "AS_LEVEL", "AS"]:
+        return "AS Level"
+    if lvl_upper in ["A LEVEL", "A-LEVEL", "A_LEVEL", "A"]:
+        return "A Level"
+    if lvl_upper in ["AP", "ADVANCED PLACEMENT"]:
+        return "AP"
+    if "ADVANCED" in lvl_upper:
+        return "Advanced"
+    if "CORE" in lvl_upper:
+        return "Core"
+    if "EXTENDED" in lvl_upper:
+        return "Extended"
+    if "HIGHER" in lvl_upper or lvl_upper == "HL":
+        return "Higher"
+    if "HONOR" in lvl_upper:
+        return "Honors"
+    if "STANDARD" in lvl_upper or lvl_upper == "SL":
+        return "Standard"
+        
+    return "Not Applicable"
+
+def normalize_grounded_dropdowns(data):
     """
-    Recursively updates dictionary objects containing the 'board' key
-    by running them through normalize_board.
+    Recursively scans and updates dropdown values in the parsed payload:
+    - 'board' -> normalize_board
+    - 'testType' -> normalize_test_type
+    - 'level' -> normalize_level
+    - 'degree' -> normalize_degree
     """
     if isinstance(data, dict):
-        new_data = {k: normalize_boards_in_data(v) for k, v in data.items()}
+        new_data = {k: normalize_grounded_dropdowns(v) for k, v in data.items()}
+        
+        # 1. Normalize board
         if 'board' in new_data and isinstance(new_data['board'], str):
             normalized, board_other = normalize_board(new_data['board'])
             new_data['board'] = normalized
             if board_other:
                 if not new_data.get('boardOther'):
                     new_data['boardOther'] = board_other
+                    
+        # 2. Normalize testType
+        if 'testType' in new_data and isinstance(new_data['testType'], str):
+            normalized, test_other = normalize_test_type(new_data['testType'])
+            new_data['testType'] = normalized
+            if test_other:
+                if not new_data.get('testTypeOther'):
+                    new_data['testTypeOther'] = test_other
+                    
+        # 3. Normalize level
+        if 'level' in new_data and isinstance(new_data['level'], str):
+            new_data['level'] = normalize_level(new_data['level'])
+            
+        # 4. Normalize degree
+        if 'degree' in new_data and isinstance(new_data['degree'], str):
+            normalized, degree_other = normalize_degree(new_data['degree'])
+            new_data['degree'] = normalized
+            if degree_other:
+                if not new_data.get('degreeOther'):
+                    new_data['degreeOther'] = degree_other
+                    
         return new_data
     elif isinstance(data, list):
-        return [normalize_boards_in_data(item) for item in data]
+        return [normalize_grounded_dropdowns(item) for item in data]
     else:
         return data
 
@@ -543,7 +825,7 @@ STRICT RULES:
 5. ACADEMIC LEVEL: Use exactly one of: "High School (8th–12th grade)", "College/Undergraduate", "Postgraduate", "Working Professional". 
    - CRITICAL: If the document contains any Full-time professional work experience (excluding internships), the ACADEMIC LEVEL must be "Working Professional".
    - If the person has completed a Bachelor's degree and is currently in a Master's or has professional experience, it must NOT be "College/Undergraduate".
-6. EDUCATIONAL RECORDS: Extract ALL educational experiences (High School, Bachelor, Master, etc.) into the "educational" array.
+6. EDUCATIONAL RECORDS: Extract ALL educational experiences (High School, Bachelor, Master, etc.) into the "educational" array. Ground the `degree` field to the standard degrees if possible (e.g. "B.A. (Bachelor of Arts)", "B.E. (Bachelor of Engineering)", "B.T. (Bachelor of Technology)", "B.Sc (Bachelor of Science)", "B.Com (Bachelor of Commerce)", "B.B.A. (Bachelor of Business Administration)", "M.B.A. (Master of Business Administration)", "M.Sc (Master of Science)", "M.Tech (Master of Technology)", "Ph.D. (Doctor of Philosophy)", etc.). If the degree is not standard, return "Other" and set the original degree name in `degreeOther`.
 7. PROFESSIONAL EXPERIENCES: Extract all work experiences into the "professional.experiences" array.
 8. HIGH SCHOOL DATA: For each High School record:
    - Set `academicLevel` to exactly "High School (8th–12th grade)".
@@ -554,16 +836,18 @@ STRICT RULES:
      * "Cambridge - IGCSE"
      * "CBSE"
      * "HSC"
+     * "IBCP" (use this if the transcript states IBCP or Career-related Programme)
      * "ICSE"
-     * "International Baccalaureate (IB)" (e.g. if the transcript says "IB" or "International Baccalaureate", you must output "International Baccalaureate (IB)")
+     * "International Baccalaureate (IB)" (e.g. if the transcript says "IB" or "International Baccalaureate" or "IBDP")
      * "ISC"
+     * "MYP" (use this if the transcript states MYP or Middle Years Programme)
      * "NIOS"
      * "State Board" (use this for all state boards, e.g. MSBSHSE, Maharashtra Board, etc.)
      * "Other"
      If you map it to "Other", fill in the original board name in the `boardOther` field.
    - Extract `overallPercentage` as the overall/aggregate percentage or score (a plain number, NO % symbol). If per-subject scores are given and no aggregate is stated, leave it empty.
    - Extract all `subjects` with their scores.
-9. SUBJECTS: For each subject, extract the name, level (if any), marks obtained (yourTotalScore as a plain number, NO % symbol), and maximum possible marks (highestTotalScore, also a plain number e.g. 100).
+9. SUBJECTS: For each subject, extract the name, level, marks obtained (yourTotalScore as a plain number, NO % symbol), and maximum possible marks (highestTotalScore, also a plain number e.g. 100). Ground the `level` field strictly to one of: "Not Applicable", "A Level", "AS Level", "AP", "Advanced", "Core", "Extended", "Higher", "Honors", "Standard".
 10. SCORES & PERCENTILES: Always return numeric scores and percentiles as plain integers or numbers WITHOUT any suffix, symbol, or unit. Do NOT include "%", "th", "rd", "st", "CGPA", "GPA", "/100", etc. Just the number (e.g. "97th Percentile" -> 97, "95%" -> 95, "7.8 CGPA" -> 7.8).
 11. PROFESSIONAL EXPERIENCES: 
    - experienceType: Use "Internship", "Full-time", or "Project".
@@ -576,7 +860,7 @@ STRICT RULES:
 13. AWARDS & SCHOLARSHIPS: Extract ALL academic honors, dean's list, scholarships, competition wins (e.g. GSoC, Hackathons, Rank in exams). Map these to the "awards" array.
     - IMPORTANT: Extract these regardless of whether they belong to High School, UG, or PG. They should all go into these global arrays.
     - Note: These items are often found in sections like "ACHIEVEMENTS", "AWARDS", "FELLOWSHIPS", or "CERTIFICATIONS".
-14. TEST SCORES: Extract ALL standardized test scores (SAT, ACT, GRE, GMAT, TOEFL, IELTS, Executive Assessment, AP, etc.).
+14. TEST SCORES: Extract ALL standardized test scores (SAT, ACT, GRE, GMAT, TOEFL, IELTS, Executive Assessment, AP, etc.). Ground the `testType` field strictly to one of: "ACT", "Executive Assessment", "GMAT", "GRE", "IELTS", "SAT", "TOEFL", "Other". If you choose "Other", specify the original test name in the `testTypeOther` field.
     - ALWAYS extract percentiles if given! Even if they are inside yellow boxes or tables (e.g. "97th Percentile", "96th", "93rd"). Clean them to plain numbers (e.g. 97, 96, 93).
     - For GMAT / GMAT Focus: Extract totalScore, yourPercentile (overall percentile e.g. 96), dataInsightsScore, dataInsightsPercentile (e.g. 90), verbalReasoningScore, verbalReasoningPercentile (e.g. 93), quantitativeReasoningScore, quantitativeReasoningPercentile (e.g. 97).
     - For GRE: Extract totalScore, analyticalWritingScore, analyticalWritingPercentile (e.g. 93), verbalReasoningScore, verbalReasoningPercentile (e.g. 91), quantitativeReasoningScore, quantitativeReasoningPercentile (e.g. 96).
@@ -595,7 +879,7 @@ JSON STRUCTURE:
     {{
        "academicLevel": "High School (8th\u201312th grade)", "gradeLevel": 12, "institutionName": "", "city": "", "yearOfCompletion": "YYYY",
        "overallPercentage": "", "maximumPossibleGPA": "",
-       "degree": "", "major": "", "startYear": "YYYY", "endYear": "YYYY",
+       "degree": "", "degreeOther": "", "major": "", "startYear": "YYYY", "endYear": "YYYY",
        "board": "",
        "boardOther": "",
        "subjects": [
@@ -611,7 +895,7 @@ JSON STRUCTURE:
   ],
   "testScores": [ 
     {{ 
-      "testType": "", "testDate": "YYYY-MM-DD", "totalScore": "", "yourScore": "", "yourPercentile": "",
+      "testType": "", "testTypeOther": "", "testDate": "YYYY-MM-DD", "totalScore": "", "yourScore": "", "yourPercentile": "",
       "mathYourScore": "", "mathYourPercentile": "", "criticalReadingYourScore": "", "criticalReadingYourPercentile": "",
       "analyticalWritingScore": "", "analyticalWritingPercentile": "", "verbalReasoningScore": "", "verbalReasoningPercentile": "", "quantitativeReasoningScore": "", "quantitativeReasoningPercentile": "",
       "dataInsightsScore": "", "dataInsightsPercentile": "", "englishYourScore": "", "englishYourPercentile": "", "readingYourScore": "", "readingYourPercentile": "", "scienceYourScore": "", "scienceYourPercentile": "",
@@ -673,9 +957,9 @@ Document content:
                 print(f"Failed to save AI response to scratch: {save_err}")
                 
             parsed = json.loads(content)
-            # Sanitize years and ground board names before returning
+            # Sanitize years and ground dropdown options before returning
             parsed = sanitize_years(parsed)
-            parsed = normalize_boards_in_data(parsed)
+            parsed = normalize_grounded_dropdowns(parsed)
             print(f"Successfully parsed AI response with keys: {list(parsed.keys())}")
         except Exception as e:
             import traceback
