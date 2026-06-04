@@ -78,4 +78,5 @@ urlpatterns = [
     path("admin/coupons/", AdminCouponListCreateView.as_view()),
     path("admin/coupons/<int:coupon_id>/", AdminCouponDetailView.as_view()),
     path("coupons/validate/", CouponValidatePublicView.as_view()),
+    path("admin/users/<int:user_id>/logs/", AdminUserLogsView.as_view()),
 ]

@@ -20,6 +20,7 @@ from apps.profiles.models import UserProfile
 from utils.profile_helpers import get_user_profile_data
 from utils.profile_formatting import format_user_profile_context
 from utils.user_helpers import get_user_display_name
+from apps.accounts.models import ActivityLog
 
 
 # Static intro message — no LLM call needed
@@ -353,6 +354,13 @@ class DomainDiscoveryService:
             current_step=0,
         )
 
+        ActivityLog.log(
+            user=user,
+            event_type="module_start",
+            description=f"Started Stream & Subject Selection session ({session_id})",
+            metadata={"module": "domain_discovery", "session_id": session_id}
+        )
+
         # Get user profile data for AI context
         user_profile = get_user_profile_data(user)
         
@@ -454,6 +462,18 @@ class DomainDiscoveryService:
             type='user',
             content=user_message,
             question_type='general'
+        )
+
+        ActivityLog.log(
+            user=session.user,
+            event_type="llm_interaction",
+            description=f"User sent message in Stream & Subject Selection",
+            metadata={
+                "module": "domain_discovery",
+                "session_id": session.session_id,
+                "type": "user",
+                "content": user_message[:200] + ("..." if len(user_message) > 200 else "")
+            }
         )
 
         # Update session step
@@ -591,6 +611,26 @@ class DomainDiscoveryService:
             question_type=question_type,
             choices=choices
         )
+
+        ActivityLog.log(
+            user=session.user,
+            event_type="llm_interaction",
+            description=f"Ivy responded in Stream & Subject Selection",
+            metadata={
+                "module": "domain_discovery",
+                "session_id": session.session_id,
+                "type": "bot",
+                "content": bot_response[:200] + ("..." if len(bot_response) > 200 else "")
+            }
+        )
+
+        if is_complete:
+            ActivityLog.log(
+                user=session.user,
+                event_type="module_complete",
+                description=f"Completed Stream & Subject Selection session ({session.session_id})",
+                metadata={"module": "domain_discovery", "session_id": session.session_id}
+            )
 
         # Save session — only update fields that process_message modified
         # to avoid overwriting background thread updates to metadata/total_steps.

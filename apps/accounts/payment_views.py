@@ -18,7 +18,7 @@ from collections import Counter
 from utils.user_dto_view import UserDTOView
 from .dtos import UserDTO
 from .roles import UserRole
-from .models import User, School, UserPayment, SchoolPayment, UserModuleSubscription, SchoolModuleSubscription, ModuleName, GradeModuleAutoAssignment, ModulePricing, Coupon
+from .models import User, School, UserPayment, SchoolPayment, UserModuleSubscription, SchoolModuleSubscription, ModuleName, GradeModuleAutoAssignment, ModulePricing, Coupon, ActivityLog
 from .serializers import UserPaymentSerializer, SchoolPaymentSerializer, SchoolModuleSubscriptionSerializer, UserModuleSubscriptionSerializer, ModulePricingSerializer, CouponSerializer
 from .services import get_module_usage_count_for_school, get_assigned_count_for_school
 from .payment_gateway import get_payment_gateway, PaymentGatewayException
@@ -534,6 +534,14 @@ class StudentCheckoutView(APIView):
             _provision_user_subscriptions(payment)
             _send_payment_status_email(payment, "completed")
             
+            ActivityLog.log(
+                user=user,
+                event_type="payment",
+                description=f"Zero-cost checkout completed for: {', '.join(modules)}",
+                metadata={"payment_id": payment.id, "modules": modules},
+                request=request
+            )
+            
             return Response({
                 "payment_id": payment.id,
                 "is_zero_cost": True,
@@ -592,6 +600,14 @@ class StudentCheckoutView(APIView):
                 "gst_number": gst_number,
             }
             payment.save()
+            
+            ActivityLog.log(
+                user=user,
+                event_type="payment",
+                description=f"Checkout initialized for: {', '.join(modules)}",
+                metadata={"payment_id": payment.id, "order_id": hdfc_order_id, "amount": total},
+                request=request
+            )
             
         except PaymentGatewayException as e:
             logger.error(f"Failed to initialize HDFC payment for user {user.id}: {str(e)}")

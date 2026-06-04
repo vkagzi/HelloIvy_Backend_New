@@ -16,6 +16,7 @@ from apps.profiles.models import UserProfile
 from domain_discovery.models import DomainMessage, DomainRecommendation
 from utils.profile_helpers import get_user_profile_data
 from utils.user_helpers import get_user_display_name
+from apps.accounts.models import ActivityLog
 
 # Static intro message — no LLM call needed
 CAREER_INTRO_MESSAGE = (
@@ -199,6 +200,13 @@ class CareerDiscoveryService:
             metadata={'domain_choices': domain_choices},
         )
 
+        ActivityLog.log(
+            user=user,
+            event_type="module_start",
+            description=f"Started Career & Degree Selection session ({session_id})",
+            metadata={"module": "career_discovery", "session_id": session_id}
+        )
+
         # Get user profile data for AI context
         user_profile = get_user_profile_data(user)
         
@@ -321,9 +329,21 @@ class CareerDiscoveryService:
             "आज आपसे बात करके बहुत अच्छा लगा! इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?"
         )
 
-        CONCLUSION_MSG_HI = (
-            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        ActivityLog.log(
+            user=session.user,
+            event_type="llm_interaction",
+            description=f"User sent message in Career & Degree Selection",
+            metadata={
+                "module": "career_discovery",
+                "session_id": session.session_id,
+                "type": "user",
+                "content": user_message[:200] + ("..." if len(user_message) > 200 else "")
+            }
         )
+
+        # Increment step
+        new_step = current_step + 1
+        session.current_step = new_step
 
         PRE_FINAL_QUESTION = PRE_FINAL_QUESTION_HI if language == 'hi' else (
             "It was fantastic talking to you today! Is there one final question "
@@ -403,6 +423,26 @@ class CareerDiscoveryService:
             content=bot_response,
             step_number=new_step
         )
+
+        ActivityLog.log(
+            user=session.user,
+            event_type="llm_interaction",
+            description=f"Ivy responded in Career & Degree Selection",
+            metadata={
+                "module": "career_discovery",
+                "session_id": session.session_id,
+                "type": "bot",
+                "content": bot_response[:200] + ("..." if len(bot_response) > 200 else "")
+            }
+        )
+
+        if is_complete:
+            ActivityLog.log(
+                user=session.user,
+                event_type="module_complete",
+                description=f"Completed Career & Degree Selection session ({session.session_id})",
+                metadata={"module": "career_discovery", "session_id": session.session_id}
+            )
 
         # Refresh token_usage from DB to include latest
         session.refresh_from_db(fields=['token_usage'])
