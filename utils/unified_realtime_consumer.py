@@ -145,7 +145,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if not self.openai_ws or not self.handler:
             return
         try:
-            instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
+            instructions = await self.get_accent_directive() + "\n\n" + await self.get_instructions()
             instructions += self.get_voice_style_directive()
             await self.openai_ws.send(json.dumps({
                 "type": "session.update",
@@ -163,7 +163,7 @@ class UnifiedRealtimeConsumer(BaseRealtimeConsumer):
         if not self.handler:
             return await super().configure_openai_session()
 
-        instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
+        instructions = await self.get_accent_directive() + "\n\n" + await self.get_instructions()
         instructions += self.get_voice_style_directive()
         custom_config = self.handler.get_session_config(
             self.session_id, self.user, instructions

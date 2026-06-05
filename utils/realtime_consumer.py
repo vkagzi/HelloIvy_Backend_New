@@ -357,8 +357,43 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
             )
         return self.VOICE_STYLE_DIRECTIVE
 
-    def get_accent_directive(self) -> str:
-        """Return the appropriate system instruction directive for the requested accent/language."""
+    from asgiref.sync import sync_to_async
+    @sync_to_async
+    def get_user_gender(self) -> Optional[str]:
+        """Fetch the student's gender from their UserProfile profile_json."""
+        user = self.user or self.scope.get('user')
+        if not user or not user.is_authenticated:
+            return None
+        try:
+            from utils.user_helpers import get_user_instance
+            from utils.profile_helpers import get_user_profile_data
+            user_instance = get_user_instance(user)
+            if not user_instance:
+                return None
+            user_profile = get_user_profile_data(user_instance)
+            profile_data = user_profile.get('profile', {}) if user_profile else {}
+            personal = profile_data.get('personalDetails', {})
+            return personal.get('gender')
+        except Exception as e:
+            logger.error(f"Error fetching user gender: {e}")
+            return None
+
+    async def get_accent_directive(self) -> str:
+        """Return the appropriate system instruction directive for the requested accent/language and student gender."""
+        directives = []
+        
+        # 1. Fetch user gender dynamically
+        gender = await self.get_user_gender()
+        if gender:
+            gender_instruction = (
+                f"[Student Gender Directive: The student you are conversing with is {gender}. "
+                f"You MUST address and refer to the student using {gender.lower()} grammatical forms, pronouns, and endings. "
+                f"In Hindi, when speaking to the student, you MUST strictly use the corresponding masculine/feminine verbs and adjectives (e.g. use 'चाहते हैं' or 'करते हैं' for Male, and 'चाहती हैं' or 'करती हैं' for Female). "
+                f"Never mix grammatical genders when referring to this student.]"
+            )
+            directives.append(gender_instruction)
+            
+        # 2. Language and accent instructions
         if getattr(self, 'language', 'en') == 'hi':
             voice = self.get_voice()
             gender_directive = (
@@ -368,39 +403,44 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
                 "You are a male Hindi-speaking counselor. You MUST speak and write using masculine grammatical forms in Hindi "
                 "(e.g., use 'करूँगा' instead of 'करूँगी', and 'मार्गदर्शक' instead of 'मार्गदर्शिका')."
             )
-            return (
-                f"\n\n[Language and Transcript Directive: {gender_directive} You MUST converse with the student in Hindi. "
+            hi_directive = (
+                f"[Language and Transcript Directive: {gender_directive} You MUST converse with the student strictly and completely in Hindi. "
                 "Speak in clear, natural, and warm Hindi. Both your spoken audio and your text transcript MUST be in Hindi (using Devanagari script). "
-                "The student will also speak and type in Hindi. Your responses, transcriptions, and all messages in the chatbox must be written strictly in Hindi (Devanagari script) - do not use English translation or Hinglish.]"
+                "The student will also speak and type in Hindi. Your responses, transcriptions, and all messages in the chatbox must be written strictly in Hindi (Devanagari script) - do not use English translation or Hinglish. "
+                "CRITICAL: Avoid using English words or vocabulary completely in your speech and transcript. If you must use a modern term, use its Hindi transliteration/pronunciation or explain it in simple Hindi. "
+                "Never switch to English words, sentences, or phrases.]"
             )
-        accent = getattr(self, 'accent', None)
-        if accent == 'indian':
-            return (
-                "\n\n[Accent Directive: You are an Indian counselor. You MUST speak with a distinct, prominent, and authentic Indian English accent. "
-                "Do NOT sound American or British. Differentiate your speech using the following Indian English phonetic patterns:\n"
-                "1. Rhythm: Use a syllable-timed rhythm (where each syllable has equal duration), which is characteristic of Indian English, rather than stress-timed rhythm.\n"
-                "2. Vowels: Pronounce vowels like in 'late' or 'goat' as pure monophthongs (pure 'ay' and 'oh' sounds) rather than diphthongs.\n"
-                "3. Consonants: Pronounce 't' and 'd' sounds with a slight retroflex (tongue curled back slightly towards the roof of the mouth, as in Indian languages), and ensure 'th' sounds (like in 'this' or 'think') are pronounced as clear plosives (closer to 'd' or 't').\n"
-                "4. Intonation: Adopt a warm, friendly, and authentic Indian regional intonation, cadence, and cadence patterns.\n"
-                "Make sure your accent is clearly and distinctly Indian from your very first word to your last.]"
-            )
-        elif accent == 'british':
-            return (
-                "\n\n[Accent Directive: You are a British counselor. You MUST speak with a clear, polished, and distinct British English accent (Received Pronunciation). "
-                "Maintain British pronunciation, speech rhythms, intonation, and phrasing throughout the entire conversation.]"
-            )
-        elif accent == 'american':
-            return (
-                "\n\n[Accent Directive: You are an American counselor. You MUST speak with a clear, natural, and distinct standard American English accent. "
-                "Maintain standard American pronunciation and intonation throughout the entire conversation.]"
-            )
-        return ""
+            directives.append(hi_directive)
+        else:
+            accent = getattr(self, 'accent', None)
+            if accent == 'indian':
+                directives.append(
+                    "[Accent Directive: You are an Indian counselor. You MUST speak with a distinct, prominent, and authentic Indian English accent. "
+                    "Do NOT sound American or British. Differentiate your speech using the following Indian English phonetic patterns:\n"
+                    "1. Rhythm: Use a syllable-timed rhythm (where each syllable has equal duration), which is characteristic of Indian English, rather than stress-timed rhythm.\n"
+                    "2. Vowels: Pronounce vowels like in 'late' or 'goat' as pure monophthongs (pure 'ay' and 'oh' sounds) rather than diphthongs.\n"
+                    "3. Consonants: Pronounce 't' and 'd' sounds with a slight retroflex (tongue curled back slightly towards the roof of the mouth, as in Indian languages), and ensure 'th' sounds (like in 'this' or 'think') are pronounced as clear plosives (closer to 'd' or 't').\n"
+                    "4. Intonation: Adopt a warm, friendly, and authentic Indian regional intonation, cadence, and cadence patterns.\n"
+                    "Make sure your accent is clearly and distinctly Indian from your very first word to your last.]"
+                )
+            elif accent == 'british':
+                directives.append(
+                    "[Accent Directive: You are a British counselor. You MUST speak with a clear, polished, and distinct British English accent (Received Pronunciation). "
+                    "Maintain British pronunciation, speech rhythms, intonation, and phrasing throughout the entire conversation.]"
+                )
+            elif accent == 'american':
+                directives.append(
+                    "[Accent Directive: You are an American counselor. You MUST speak with a clear, natural, and distinct standard American English accent. "
+                    "Maintain standard American pronunciation and intonation throughout the entire conversation.]"
+                )
+                
+        return "\n\n".join(directives)
 
     async def configure_openai_session(self):
         """Send initial session configuration to OpenAI with custom instructions"""
         try:
             logger.info(f"⚙️ Configuring session for {self.session_id} (accent: {getattr(self, 'accent', 'None')})")
-            instructions = self.get_accent_directive() + "\n\n" + await self.get_instructions()
+            instructions = await self.get_accent_directive() + "\n\n" + await self.get_instructions()
             instructions += self.get_voice_style_directive()
             logger.info(f"📝 Got instructions (length: {len(instructions)} chars)")
             
