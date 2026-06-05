@@ -399,7 +399,19 @@ For each career recommendation, you MUST also provide:
 1. **day_in_life**: A vivid, realistic narrative of a typical day in this career (morning to evening). Include specific activities, meetings, tools used, interactions with colleagues/clients, and what makes the day rewarding. Make it tangible so the student can visualize themselves in the role.
 2. **pros_and_cons**: A dictionary with "pros" (3-5 genuine advantages like growth, creativity, impact) and "cons" (3-5 honest disadvantages like stress, long hours, competition, monotony). Be truthful — sugarcoating cons is a disservice to the student.
 3. **work_life_balance**: An honest assessment covering typical working hours, remote/hybrid potential, stress levels, vacation flexibility, on-call expectations, and how this career compares to similar roles. Factor in the student's stated preferences for lifestyle and work patterns.
-4. **degrees**: An array of 4-6 degree objects. Each degree object MUST include:
+4. **feasibility**: An object with two keys:
+   - "level": One of "High", "Medium", or "Low" — representing how realistically achievable this career is for THIS specific student given their current profile, education level, location, financial situation, and any constraints or disabilities mentioned.
+     * **High**: The student already has the foundational profile, background, and realistic pathway. Minimal major barriers.
+     * **Medium**: The career is achievable but requires overcoming 1-2 significant gaps (e.g., acquiring a specific skill set, relocating, changing degree track). Doable with deliberate effort.
+     * **Low**: There are substantial barriers — multiple missing prerequisites, significant financial constraints, geographic limitations, or fundamental profile mismatches that make this career genuinely hard to achieve for this particular student.
+   - "reason": A 1-2 sentence explanation tied DIRECTLY to the student's profile. Do NOT use generic statements — cite the specific factors (e.g., "Your IIT Kanpur engineering background directly prepares you for this role, and your ML project experience reduces the ramp-up time significantly.", or "You're still in Grade 10 without a clear coding background, so the path to this role requires 6-7 years of deliberate skill-building and education in computer science.").
+5. **skill_gaps**: A list of EXACTLY 5 strings — the top 5 specific skills or knowledge areas the student is currently missing for this particular career, based on what you know about their profile and conversation. These must be:
+   - Concrete and actionable (NOT generic like "more experience" — instead say "Hands-on experience with TensorFlow/PyTorch for deep learning" or "Statistical inference and hypothesis testing")
+   - Ranked from most critical to least critical
+   - Personalised to THIS student's actual gaps, not a generic list for the job title
+   - Written as short noun phrases (3-8 words each)
+   Examples: "Python and data manipulation skills", "Public speaking and client communication", "Financial modelling in Excel", "User research and usability testing methods", "Machine learning model deployment (MLOps)"
+6. **degrees**: An array of 4-6 degree objects. Each degree object MUST include:
    - "degree": Degree name (e.g. "B.S. in Computer Science", "MBA", "B.A. in Psychology")
    - "fit_score": Integer 1-5 reflecting BOTH career relevance AND student profile alignment (interests, strengths, preferred subjects). Higher = better fit.
    - "fit_reason": 5-8 word justification tied to user profile and career

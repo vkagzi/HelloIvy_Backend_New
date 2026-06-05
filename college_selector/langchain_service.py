@@ -535,7 +535,13 @@ VOICE-SPECIFIC GUIDELINES:
 
         async for chunk in self.llm.astream(langchain_messages):
             if hasattr(chunk, 'content') and chunk.content:
-                yield chunk.content
+                content = chunk.content
+                if isinstance(content, list):
+                    content = "".join([
+                        part.get("text", "") if isinstance(part, dict) else str(part)
+                        for part in content
+                    ])
+                yield content
 
     def stream_question(
         self,
