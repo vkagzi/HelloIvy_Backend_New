@@ -312,8 +312,22 @@ class CareerMessageStreamView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            def sync_stream():
+                import asyncio
+                loop = asyncio.new_event_loop()
+                agen = career_discovery_service.process_message_stream(session, content)
+                try:
+                    while True:
+                        try:
+                            chunk = loop.run_until_complete(agen.__anext__())
+                            yield chunk
+                        except StopAsyncIteration:
+                            break
+                finally:
+                    loop.close()
+
             return StreamingHttpResponse(
-                career_discovery_service.process_message_stream(session, content),
+                sync_stream(),
                 content_type='text/event-stream'
             )
 
