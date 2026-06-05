@@ -220,11 +220,11 @@ class CareerDiscoveryService:
         
         # Log domain context for debugging
         if domain_context and domain_context.get('recommendations'):
-            print(f"✅ Domain context loaded with {len(domain_context.get('recommendations', []))} recommendations")
+            print(f"[SUCCESS] Domain context loaded with {len(domain_context.get('recommendations', []))} recommendations")
             for i, rec in enumerate(domain_context.get('recommendations', []), 1):
                 print(f"  {i}. {rec.get('title')} ({rec.get('match_percentage')}%)")
         else:
-            print("⚠️ Warning: No domain recommendations found for this session")
+            print("[WARNING] No domain recommendations found for this session")
         
         # Generate session notes in background - not needed for the first question
         # Notes will be ready by the time the student responds to Q1
@@ -244,9 +244,9 @@ class CareerDiscoveryService:
                     s.notes = notes
                     s.save(update_fields=['notes'])
                     self._save_token_usage(s, notes_token_usage)
-                    print(f"✅ Session notes saved in background ({len(notes)} chars)")
+                    print(f"[SUCCESS] Session notes saved in background ({len(notes)} chars)")
             except Exception as e:
-                print(f"⚠️ Background session notes generation failed: {e}")
+                print(f"[WARNING] Background session notes generation failed: {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -597,6 +597,8 @@ class CareerDiscoveryService:
                 day_in_life=rec_data.get('day_in_life', ''),
                 pros_and_cons=rec_data.get('pros_and_cons', {}),
                 work_life_balance=rec_data.get('work_life_balance', ''),
+                feasibility=rec_data.get('feasibility', {}),
+                skill_gaps=rec_data.get('skill_gaps', []),
                 rank=i + 1
             )
             stored_recommendations.append(rec)
@@ -625,6 +627,8 @@ class CareerDiscoveryService:
                 'day_in_life': rec.day_in_life,
                 'pros_and_cons': rec.pros_and_cons,
                 'work_life_balance': rec.work_life_balance,
+                'feasibility': rec.feasibility,
+                'skill_gaps': rec.skill_gaps,
                 'rank': rec.rank
             }
             for rec in recommendations

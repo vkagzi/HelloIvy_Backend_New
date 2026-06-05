@@ -51,6 +51,7 @@ class CareerRecommendationSerializer(serializers.ModelSerializer):
             'why_recommended', 'alignment_points', 'related_subjects',
             'degrees',
             'day_in_life', 'pros_and_cons', 'work_life_balance',
+            'feasibility', 'skill_gaps',
             'rank', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']

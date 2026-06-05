@@ -69,6 +69,17 @@ class ProsAndConsSchema(BaseModel):
     cons: List[str] = Field(description="List of 3-5 disadvantages/challenges of this career")
 
 
+class FeasibilitySchema(BaseModel):
+    """Schema for the feasibility metric of a career recommendation"""
+    level: Literal["High", "Medium", "Low"] = Field(
+        description="Overall feasibility level: High (student can realistically pursue this with current profile), Medium (achievable with moderate effort/changes), Low (significant barriers exist)"
+    )
+    reason: str = Field(
+        description="1-2 sentence explanation grounded in the student's actual profile — cite specific factors like current skills, education, location, finances, or constraints that drive this rating.",
+        max_length=400,
+    )
+
+
 class DegreePathwaySchema(BaseModel):
     """Schema for a pathway within a degree"""
     rank: str = Field(description="Pathway rank: 'Core Path', 'Alternate Path', or 'Differentiated Path'")
@@ -105,6 +116,14 @@ class CareerRecommendationSchema(BaseModel):
     pros_and_cons: ProsAndConsSchema = Field(description="Pros and cons of this career")
     work_life_balance: str = Field(description="Honest assessment of work-life balance including typical working hours, remote work potential, stress levels, flexibility, and how it compares to similar careers", max_length=1000)
     agent_scores: Optional[AgentScoreSchema] = Field(description="Individual scores from each evaluation dimension", default=None)
+    feasibility: FeasibilitySchema = Field(
+        description="Feasibility rating (High/Medium/Low) for this career given the student's actual profile, skills, education, and constraints — with a brief evidence-based reason."
+    )
+    skill_gaps: List[str] = Field(
+        description="Top 5 specific skill or knowledge gaps the student currently has for this career, based on their profile and conversation. Each item should be a concrete, actionable gap (e.g. 'Python programming fundamentals', 'Statistical modelling knowledge', 'Public speaking confidence'). Exactly 5 items.",
+        min_length=5,
+        max_length=5,
+    )
 
 
 class CareerRecommendationsOutput(BaseModel):
@@ -174,11 +193,11 @@ class CareerDiscoveryLangChainService:
             self._recommendations_llm = create_azure_chat_openai(temperature=0.7, max_tokens=8000, reasoning_effort=reasoning_effort)
 
             self._is_initialized = True
-            print("✅ Career & Degree Selection LangChain Service initialized with Azure OpenAI")
+            print("[SUCCESS] Career & Degree Selection LangChain Service initialized with Azure OpenAI")
 
         except Exception as e:
             self._init_error = str(e)
-            print(f"❌ Failed to initialize Career & Degree Selection LangChain Service: {e}")
+            print(f"[ERROR] Failed to initialize Career & Degree Selection LangChain Service: {e}")
             raise
 
     @property
@@ -517,7 +536,7 @@ return secondary_domain as null."""
             "career_references": career_refs,
             "hybrid_career_references": hybrid_refs,
         }
-        print(f"✅ Structured domain extraction: {primary} + {secondary} "
+        print(f"[SUCCESS] Structured domain extraction: {primary} + {secondary} "
               f"| {len(career_refs)} careers | {len(hybrid_refs)} hybrid")
         return result
 
@@ -860,7 +879,7 @@ Generate the coaching notes:"""
             if len(notes) > 2500:
                 notes = notes[:2500]
             
-            print(f"✅ Generated career session notes ({len(notes)} chars)")
+            print(f"[SUCCESS] Generated career session notes ({len(notes)} chars)")
             return notes
             
         except Exception as e:
@@ -1043,7 +1062,7 @@ CRITICAL REQUIREMENTS:
 Generate your personalized opening:"""
 
         else:
-            print("⚠️ No domain results available for initial question generation.")
+            print("[WARNING] No domain results available for initial question generation.")
             prompt = f"""Generate a warm, personalized opening message for a student named {user_name} who is about to start their Career & Degree Selection journey.
 
 RULES:
@@ -1586,6 +1605,17 @@ Each item MUST include:
     "Domain: [domain connection]",
     "Conversation: [quote/insight from student]"
   ],
+  "feasibility": {{
+    "level": "High | Medium | Low",
+    "reason": "1-2 sentence explanation citing specific factors from this student's actual profile, education, location, skills, or constraints."
+  }},
+  "skill_gaps": [
+    "Most critical skill gap — concrete and specific to this student",
+    "Second most critical skill gap",
+    "Third skill gap",
+    "Fourth skill gap",
+    "Fifth skill gap"
+  ],
   "agent_scores": {{
     "psychologist": 0-100,
     "market_reality": 0-100,
@@ -1693,7 +1723,13 @@ Output ONLY a JSON object with a "recommendations" array. Ensure valid JSON."""
 
         async for chunk in self.llm.astream(langchain_messages):
             if hasattr(chunk, 'content') and chunk.content:
-                yield chunk.content
+                content = chunk.content
+                if isinstance(content, list):
+                    content = "".join([
+                        part.get("text", "") if isinstance(part, dict) else str(part)
+                        for part in content
+                    ])
+                yield content
 
     def stream_question(
         self,

@@ -102,6 +102,16 @@ class CareerRecommendation(models.Model):
     day_in_life = models.TextField(blank=True)
     pros_and_cons = models.JSONField(default=dict)
     work_life_balance = models.TextField(blank=True)
+    feasibility = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Feasibility metric: {level: High|Medium|Low, reason: str}"
+    )
+    skill_gaps = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Top 5 personalised skill gaps for this career given the student's profile"
+    )
     rank = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

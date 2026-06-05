@@ -184,7 +184,7 @@ class DomainDiscoveryLangChainService:
                 # Fallback if include_raw didn't work as expected  
                 result = raw_result
             
-            print(f"🔧 Structured output received: {result}")
+            print(f"[INFO] Structured output received: {result}")
             
             if result is None:
                 raise ValueError("Structured output returned None")
@@ -1054,7 +1054,13 @@ Rules:
 
         async for chunk in self.llm.astream(langchain_messages):
             if hasattr(chunk, 'content') and chunk.content:
-                yield chunk.content
+                content = chunk.content
+                if isinstance(content, list):
+                    content = "".join([
+                        part.get("text", "") if isinstance(part, dict) else str(part)
+                        for part in content
+                    ])
+                yield content
 
     def stream_question(
         self,
