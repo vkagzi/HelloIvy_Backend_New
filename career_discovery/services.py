@@ -2,6 +2,7 @@
 Career & Degree Selection Service Layer
 Handles session management, message processing, and integrates with LangChain AI service
 """
+import json
 import uuid
 import threading
 from typing import Dict, Any, List, Optional
@@ -17,6 +18,7 @@ from domain_discovery.models import DomainMessage, DomainRecommendation
 from utils.profile_helpers import get_user_profile_data
 from utils.user_helpers import get_user_display_name
 from apps.accounts.models import ActivityLog
+from asgiref.sync import sync_to_async
 
 # Static intro message — no LLM call needed
 CAREER_INTRO_MESSAGE = (
@@ -307,19 +309,8 @@ class CareerDiscoveryService:
             for msg in messages
         ]
 
-    @transaction.atomic
-    def process_message(self, session: CareerSession, user_message: str) -> Dict[str, Any]:
-        """
-        Process a user message and generate the next question or finalize the conversation.
-        
-        Returns a dict with:
-        - session_id: str
-        - user_message: str
-        - bot_response: str
-        - current_step: int
-        - total_steps: int
-        - is_complete: bool
-        """
+    async def process_message_stream(self, session: CareerSession, user_message: str):
+        """Streaming version of process_message that yields chunks."""
         # Get language from settings
         language = 'en'
         if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
@@ -328,20 +319,24 @@ class CareerDiscoveryService:
         PRE_FINAL_QUESTION_HI = (
             "आज आपसे बात करके बहुत अच्छा लगा! इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?"
         )
+        CONCLUSION_MSG_HI = (
+            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        )
 
-        ActivityLog.log(
+        await sync_to_async(ActivityLog.log)(
             user=session.user,
             event_type="llm_interaction",
-            description=f"User sent message in Career & Degree Selection",
+            description=f"User sent message in Career & Degree Selection (stream)",
             metadata={
                 "module": "career_discovery",
                 "session_id": session.session_id,
                 "type": "user",
-                "content": user_message[:200] + ("..." if len(user_message) > 200 else "")
+                "content": user_message[:200]
             }
         )
 
         # Increment step
+        current_step = int(session.current_step)
         new_step = current_step + 1
         session.current_step = new_step
 
@@ -357,48 +352,41 @@ class CareerDiscoveryService:
         )
 
         metadata = session.metadata or {}
+        bot_response_full = ""
+        is_complete = False
 
         # ── Pre-final answer handling ────────────────────────────
-        # If we already asked the pre-final question last turn,
-        # handle the user's response now.
         if metadata.get('pre_final_asked') and not metadata.get('pre_final_answered'):
             metadata['pre_final_answered'] = True
             session.metadata = metadata
             is_complete = True
-            bot_response = self._handle_pre_final_response(session, user_message)
+            bot_response_full = await sync_to_async(self._handle_pre_final_response)(session, user_message)
+            yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True})}\n\n"
         else:
-            # Check if conversation is complete
             is_complete = new_step >= self.total_steps
 
             if is_complete and not metadata.get('pre_final_asked'):
-                # Ask pre-final question instead of concluding
                 is_complete = False
                 session.total_steps = new_step + 1
                 metadata['pre_final_asked'] = True
                 session.metadata = metadata
-                bot_response = PRE_FINAL_QUESTION
+                bot_response_full = PRE_FINAL_QUESTION
+                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': False})}\n\n"
             elif is_complete:
-                bot_response = CONCLUSION_MSG
+                bot_response_full = CONCLUSION_MSG
+                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True})}\n\n"
             else:
-                # Get all messages for context
-                all_messages = self.get_session_messages(session)
-            
-                # Get user profile data for AI context
-                user_profile = get_user_profile_data(session.user)
-                
-                # Get Stream & Subject Selection context
-                domain_context = self.get_domain_discovery_context(session)
-                # Attach pre-computed domain choices (set at session creation)
+                # Actual LLM stream
+                all_messages = await sync_to_async(self.get_session_messages)(session)
+                user_profile = await sync_to_async(get_user_profile_data)(session.user)
+                domain_context = await sync_to_async(self.get_domain_discovery_context)(session)
                 domain_context['domain_choices'] = session.metadata.get('domain_choices', {})
-                
-                # Token usage tracker for this request
                 token_usage = {}
 
-                user_name = get_user_display_name(
-                    None, session.user, 'there'
-                )
+                user_name = await sync_to_async(get_user_display_name)(None, session.user, 'there')
 
-                bot_response = self.langchain_service.generate_question(
+                # Use astream_question for true async streaming
+                async for chunk in self.langchain_service.astream_question(
                     step=new_step,
                     user_response=user_message,
                     messages=all_messages,
@@ -408,50 +396,60 @@ class CareerDiscoveryService:
                     session_notes=session.notes or "",
                     token_usage=token_usage,
                     language=language,
-                )
+                ):
+                    bot_response_full += chunk
+                    yield f"data: {json.dumps({'delta': chunk, 'is_complete': False})}\n\n"
+
                 
-                # Save token usage
-                self._save_token_usage(session, token_usage)
+                # Signal completion
+                yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete})}\n\n"
 
-        session.save()
+        await sync_to_async(session.save)()
 
-        # Save bot response
-        bot_msg = CareerMessage.objects.create(
+        # Save full bot response to DB
+        await sync_to_async(CareerMessage.objects.create)(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
             type='bot',
-            content=bot_response,
+            content=bot_response_full,
             step_number=new_step
         )
 
-        ActivityLog.log(
-            user=session.user,
-            event_type="llm_interaction",
-            description=f"Ivy responded in Career & Degree Selection",
-            metadata={
-                "module": "career_discovery",
-                "session_id": session.session_id,
-                "type": "bot",
-                "content": bot_response[:200] + ("..." if len(bot_response) > 200 else "")
-            }
-        )
-
         if is_complete:
-            ActivityLog.log(
+            await sync_to_async(ActivityLog.log)(
                 user=session.user,
                 event_type="module_complete",
                 description=f"Completed Career & Degree Selection session ({session.session_id})",
                 metadata={"module": "career_discovery", "session_id": session.session_id}
             )
 
+
+    @transaction.atomic
+    def process_message(self, session: CareerSession, user_message: str) -> Dict[str, Any]:
+        """
+        Process a user message and generate the next question or finalize the conversation.
+        """
+        bot_response = ""
+        is_complete = False
+        
+        # Consume the stream to get the full response for the sync API
+        for chunk_json in self.process_message_stream(session, user_message):
+            if chunk_json.startswith("data: "):
+                try:
+                    data = json.loads(chunk_json[6:].strip())
+                    bot_response += data.get("delta", "")
+                    is_complete = data.get("is_complete", False)
+                except json.JSONDecodeError:
+                    continue
+
         # Refresh token_usage from DB to include latest
-        session.refresh_from_db(fields=['token_usage'])
+        session.refresh_from_db(fields=['token_usage', 'current_step'])
 
         return {
             'session_id': session.session_id,
             'user_message': user_message,
             'bot_response': bot_response,
-            'current_step': new_step,
+            'current_step': session.current_step,
             'total_steps': self.total_steps,
             'is_complete': is_complete,
             'token_usage': session.token_usage or {}

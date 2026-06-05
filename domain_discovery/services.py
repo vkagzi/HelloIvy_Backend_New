@@ -4,6 +4,7 @@ Handles session management, message processing, and integrates with LangChain AI
 """
 import uuid
 import threading
+import json
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -433,30 +434,19 @@ class DomainDiscoveryService:
             for msg in messages
         ]
 
-    @transaction.atomic
-    def process_message(self, session: DomainSession, user_message: str) -> Dict[str, Any]:
+    async def process_message_stream(self, session: DomainSession, user_message: str):
         """
-        Process a user message and generate the next question or finalize the conversation.
-        
-        Returns a dict with:
-        - session_id: str
-        - bot_response: str
-        - question_type: str ('riasec', 'deepdive', or 'general')
-        - choices: list (for RIASEC questions)
-        - current_step: int
-        - riasec_completed: int
-        - deepdive_completed: int
-        - is_complete: bool
-        - phase: str
-        - progress_percentage: int
-        - questions_completed: int
+        Async generator that yields SSE-formatted JSON chunks.
         """
         # Cache values that trigger DB queries
         current_step = session.current_step
         new_step = current_step + 1
         
-        # Save user message
-        DomainMessage.objects.create(
+        # Save user message (since this is async, we use sync_to_async or just run in sync context for simple DB ops if needed)
+        # But for streaming, we want to start yielding as soon as possible.
+        from asgiref.sync import sync_to_async
+        
+        await sync_to_async(DomainMessage.objects.create)(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
             type='user',
@@ -464,7 +454,7 @@ class DomainDiscoveryService:
             question_type='general'
         )
 
-        ActivityLog.log(
+        await sync_to_async(ActivityLog.log)(
             user=session.user,
             event_type="llm_interaction",
             description=f"User sent message in Stream & Subject Selection",
@@ -479,21 +469,15 @@ class DomainDiscoveryService:
         # Update session step
         session.current_step = new_step
         
-        # Refresh conclusion-related fields from DB so we see the latest
-        # background thread updates (should_conclude, total_steps) that may
-        # have been committed after the session object was loaded by the view.
-        session.refresh_from_db(fields=['total_steps', 'metadata'])
+        # Refresh conclusion-related fields
+        await sync_to_async(session.refresh_from_db)(fields=['total_steps', 'metadata'])
         
-        # Track which fields process_message modifies so the final save
-        # doesn't overwrite background thread updates to other fields.
         save_fields = ['current_step', 'updated_at']
         
         # Initialize response variables
         question_type = 'general'
-        choices = []
         bot_response = ""
         is_complete = False
-        is_last_question = False
 
         # Get language from settings
         language = 'en'
@@ -522,46 +506,36 @@ class DomainDiscoveryService:
         metadata = session.metadata or {}
 
         # ── Pre-final answer handling ────────────────────────────
-        # If we already asked the pre-final question last turn,
-        # handle the user's response now before any conclusion checks.
         if metadata.get('pre_final_asked') and not metadata.get('pre_final_answered'):
             metadata['pre_final_answered'] = True
             session.metadata = metadata
             save_fields.append('metadata')
             is_complete = True
-            bot_response = self._handle_pre_final_response(session, user_message)
+            bot_response = await sync_to_async(self._handle_pre_final_response)(session, user_message)
 
         # ── Step 1: Check existing conclusion state ──────────────
         if not is_complete and session.is_completed:
             is_complete = True
             bot_response = CONCLUSION_MSG
-        elif not is_complete and self.check_and_update_conclusion(session, new_step):
+        elif not is_complete and await sync_to_async(self.check_and_update_conclusion)(session, new_step):
             is_complete = True
             save_fields.append('total_steps')
             bot_response = CONCLUSION_MSG
 
         # ── Step 2: Synchronous conclusion evaluation ────────────
-        # Run inline (blocking) when past min_deepdive_questions so we
-        # don't rely on the background thread which can lose the race
-        # when messages arrive faster than the LLM can evaluate.
         if (not is_complete
                 and new_step >= self.min_deepdive_questions
                 and new_step < self.max_deepdive_questions):
-            if self.evaluate_conclusion_sync(session, new_step):
+            if await sync_to_async(self.evaluate_conclusion_sync)(session, new_step):
                 is_complete = True
                 save_fields.extend(['total_steps', 'metadata'])
                 bot_response = CONCLUSION_MSG
             else:
-                # Persist last_checked_step even when not concluding
                 save_fields.append('metadata')
 
         # ── Pre-final question intercept ─────────────────────────
-        # If conclusion was just triggered but we haven't asked the
-        # pre-final question yet, ask it instead of concluding.
         if is_complete and not metadata.get('pre_final_asked'):
             is_complete = False
-            is_last_question = False
-            # Allow one more step for the user's answer to the pre-final Q
             session.total_steps = new_step + 1
             metadata['pre_final_asked'] = True
             session.metadata = metadata
@@ -572,100 +546,88 @@ class DomainDiscoveryService:
             bot_response = PRE_FINAL_QUESTION
             question_type = 'general'
 
-        # ── Step 3: Generate response if not concluding ──────────
+        # ── Step 3: Stream and Generate response ──────────
         if not is_complete and not bot_response:
-            all_messages = self.get_session_messages(session) if new_step >= 2 else None
-            user_profile = get_user_profile_data(session.user)
-            token_usage = {}
-
-            result = self.langchain_service.generate_question(
-                step=new_step,
-                user_response=user_message if new_step >= 2 else None,
+            all_messages = await sync_to_async(self.get_session_messages)(session) if new_step >= 2 else None
+            user_profile = await sync_to_async(get_user_profile_data)(session.user)
+            user_name = await sync_to_async(get_user_display_name)(None, session.user, '')
+            
+            question_type = 'deepdive'
+            full_bot_response = ""
+            
+            # Use LangChain astream for true async delivery
+            async for chunk in self.langchain_service.astream_question(
+                current_step=new_step,
+                user_message=user_message if new_step >= 2 else "",
                 messages=all_messages,
                 user_profile=user_profile,
                 min_questions=self.min_deepdive_questions,
                 max_questions=self.max_deepdive_questions,
                 session_notes=session.notes or "",
-                token_usage=token_usage,
-                user_name=get_user_display_name(None, session.user, ''),
+                user_name=user_name,
                 language=language,
-            )
+            ):
+                full_bot_response += chunk
+                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False})}\n\n"
+            
+            bot_response = full_bot_response
 
-            bot_response = result['question']
-            question_type = 'deepdive'
 
             # Hard cap: if we've hit max questions, conclude regardless
             if new_step >= self.max_deepdive_questions:
                 session.total_steps = new_step
                 save_fields.append('total_steps')
-                is_last_question = True
+        else:
+            # For non-streaming cases (conclusion/greeting), yield the full response in one chunk
+            yield f"data: {json.dumps({'delta': bot_response, 'is_complete': False})}\n\n"
 
-            self._save_token_usage(session, token_usage)
-
-        # Save bot response
-        DomainMessage.objects.create(
+        # Finalize
+        await sync_to_async(DomainMessage.objects.create)(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
             type='bot',
             content=bot_response,
             question_type=question_type,
-            choices=choices
+            choices=[]
         )
 
-        ActivityLog.log(
-            user=session.user,
-            event_type="llm_interaction",
-            description=f"Ivy responded in Stream & Subject Selection",
-            metadata={
-                "module": "domain_discovery",
-                "session_id": session.session_id,
-                "type": "bot",
-                "content": bot_response[:200] + ("..." if len(bot_response) > 200 else "")
-            }
-        )
-
-        if is_complete:
-            ActivityLog.log(
-                user=session.user,
-                event_type="module_complete",
-                description=f"Completed Stream & Subject Selection session ({session.session_id})",
-                metadata={"module": "domain_discovery", "session_id": session.session_id}
-            )
-
-        # Save session — only update fields that process_message modified
-        # to avoid overwriting background thread updates to metadata/total_steps.
-        session.save(update_fields=save_fields)
-
-        # Get final counts for response
-        final_deepdive_completed = session.deepdive_completed
-        final_phase = 'deepdive'  # Always deepdive now since RIASEC is disabled
+        await sync_to_async(session.save)(update_fields=save_fields)
         
-        # Refresh token_usage from DB to include latest
-        session.refresh_from_db(fields=['token_usage'])
+        yield f"data: {json.dumps({'delta': '', 'is_complete': True})}\n\n"
+
+    @transaction.atomic
+    def process_message(self, session: DomainSession, user_message: str) -> Dict[str, Any]:
+        """
+        Synchronous wrapper for process_message_stream.
+        """
+        import asyncio
+        from asgiref.sync import async_to_sync
+
+        async def _collect_stream():
+            full_response = ""
+            async for chunk in self.process_message_stream(session, user_message):
+                if chunk.startswith("data: "):
+                    data = json.loads(chunk[6:])
+                    full_response += data.get('delta', '')
+            return full_response
+
+        bot_response = async_to_sync(_collect_stream)()
         
-        # Calculate progress: use min_questions as the baseline for progress display
-        # Once past min, show progress approaching 100%
-        if new_step <= self.min_deepdive_questions:
-            progress_percentage = int((new_step / self.min_deepdive_questions) * 90)  # Up to 90% during min phase
-        else:
-            progress_percentage = 90 + int(((new_step - self.min_deepdive_questions) / (self.max_deepdive_questions - self.min_deepdive_questions)) * 10)
-        progress_percentage = min(progress_percentage, 100)
-        
+        # Refresh session to get latest state after stream updates
+        session.refresh_from_db()
+
         return {
             'session_id': session.session_id,
             'bot_response': bot_response,
-            'question_type': question_type,
-            'choices': choices,
-            'current_step': new_step,
-            # RIASEC fields disabled - may be re-enabled later
-            # 'riasec_completed': 0,
-            'deepdive_completed': final_deepdive_completed,
-            'is_complete': is_complete,
-            'is_last_question': is_last_question,
-            'phase': final_phase,
-            'progress_percentage': progress_percentage,
-            'questions_completed': new_step,
-            'token_usage': session.token_usage or {}
+            'question_type': 'deepdive',  # Simplified for synchronous return
+            'choices': [],
+            'current_step': session.current_step,
+            'riasec_completed': 0, # Not used in Domain Discovery as same as Career
+            'deepdive_completed': session.current_step,
+            'is_complete': session.is_completed,
+            'phase': 'deepdive',
+            'progress_percentage': int((session.current_step / session.total_steps) * 100) if session.total_steps > 0 else 0,
+            'questions_completed': session.current_step,
         }
 
     def end_session(self, session: DomainSession) -> DomainSession:

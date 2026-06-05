@@ -213,6 +213,63 @@ class CollegeSelectorLangChainService:
         token_usage["total_cache_creation_tokens"] = token_usage.get("total_cache_creation_tokens", 0) + (input_details.get("cache_creation", 0) or 0)
         token_usage["total_reasoning_tokens"] = token_usage.get("total_reasoning_tokens", 0) + (output_details.get("reasoning", 0) or 0)
 
+    def stream_question(
+        self,
+        preferences: dict,
+        user_profile: dict,
+        messages: List[Dict[str, Any]],
+        user_message: str,
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+        """Stream a conversational response."""
+        if token_usage is None:
+            token_usage = {}
+
+        preferences_context = build_preferences_context(preferences)
+        profile_context = format_user_profile_context(user_profile)
+
+        system_prompt = CONVERSATION_SYSTEM_PROMPT.format(
+            preferences_context=preferences_context,
+            profile_context=profile_context,
+        )
+
+        if language == 'hi':
+            system_prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including greetings, questions, comparison highlights, "
+                "and acknowledgments, must be written in clear, warm, and natural Devanagari Hindi text. "
+                "Ensure your streamed response is warm and conversational. "
+                "IMPORTANT: In streaming mode, DO NOT return JSON. Return ONLY the conversational text response directly.]"
+            )
+        else:
+            system_prompt += "\n\nIMPORTANT: In streaming mode, DO NOT return JSON. Return ONLY the conversational text response directly."
+
+        langchain_messages = [SystemMessage(content=system_prompt)]
+        for msg in messages:
+            if msg.get('type') == MessageType.BOT or msg.get('role') == 'assistant':
+                langchain_messages.append(AIMessage(content=msg['content']))
+            else:
+                langchain_messages.append(HumanMessage(content=msg['content']))
+        
+        if user_message:
+            langchain_messages.append(HumanMessage(content=user_message))
+
+        try:
+            # We use the raw stream from the LLM
+            for chunk in self.llm.stream(langchain_messages):
+                content = chunk.content
+                if isinstance(content, list):
+                    content = "".join(
+                        block if isinstance(block, str) else block.get("text", "")
+                        for block in content
+                    )
+                if content:
+                    yield content
+        except Exception as e:
+            logger.error(f"Error streaming college selector response: {e}")
+            raise
+
     def generate_response(
         self,
         preferences: dict,
@@ -434,6 +491,100 @@ VOICE-SPECIFIC GUIDELINES:
                 "Keep responses concise and natural for voice conversation. Keep the voice query response under 30 words.]"
             )
         return instructions
+
+    async def astream_question(
+        self,
+        current_step: int,
+        messages: List[Dict[str, Any]],
+        preferences: dict,
+        user_profile: Dict[str, Any],
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+        """Async stream a response for the next College Selector question."""
+        self._initialize_llm()
+        if token_usage is None:
+            token_usage = {}
+
+        preferences_context = build_preferences_context(preferences)
+        profile_context = format_user_profile_context(user_profile)
+
+        history_msgs = []
+        for msg in messages:
+            if msg.get('type') == MessageType.USER:
+                history_msgs.append(HumanMessage(content=msg.get('content', '')))
+            else:
+                history_msgs.append(AIMessage(content=msg.get('content', '')))
+
+        system_prompt = CONVERSATION_SYSTEM_PROMPT.format(
+            current_question_number=current_step,
+            preferences_context=preferences_context,
+            profile_context=profile_context,
+        )
+
+        if language == 'hi':
+            system_prompt += (
+                "\n\nIMPORTANT: The student's preferred language is Hindi. "
+                "Please respond in Hindi while maintaining the same persona and guidelines."
+            )
+
+        langchain_messages = [
+            SystemMessage(content=system_prompt),
+            *history_msgs,
+        ]
+
+        async for chunk in self.llm.astream(langchain_messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                yield chunk.content
+
+    def stream_question(
+        self,
+        current_step: int,
+        messages: List[Dict[str, Any]],
+        preferences: Dict[str, Any],
+        user_profile: Dict[str, Any],
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+        """Stream a response for the next College Selector question."""
+        self._initialize_llm()
+        if token_usage is None:
+            token_usage = {}
+
+        preferences_context = build_preferences_context(preferences)
+        profile_context = format_user_profile_context(user_profile)
+
+        history_msgs = []
+        for msg in messages:
+            if msg.get('type') == MessageType.USER:
+                history_msgs.append(HumanMessage(content=msg.get('content', '')))
+            else:
+                history_msgs.append(AIMessage(content=msg.get('content', '')))
+
+        system_prompt = CONVERSATION_SYSTEM_PROMPT.format(
+            current_question_number=current_step,
+            preferences_context=preferences_context,
+            profile_context=profile_context,
+        )
+
+        if language == 'hi':
+            system_prompt += (
+                "\n\nIMPORTANT: The student's preferred language is Hindi. "
+                "Please respond in Hindi while maintaining the same persona and guidelines."
+            )
+
+        langchain_messages = [
+            SystemMessage(content=system_prompt),
+            *history_msgs,
+        ]
+
+        # Use the latest student message content if available
+        # But we assume 'messages' already contains the latest user message
+        # In typical flow, we append user message to messages before calling stream_question
+
+        for chunk in self.llm.stream(langchain_messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                yield chunk.content
 
     def evaluate_conclusion(
         self,

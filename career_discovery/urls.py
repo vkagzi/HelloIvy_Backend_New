@@ -5,6 +5,7 @@ from .views import (
     CareerSessionListView,
     CareerSessionDetailView,
     CareerMessageCreateView,
+    CareerMessageStreamView,
     CareerMessageHistoryView,
     CareerSessionEndView,
     CareerSessionPauseView,
@@ -33,6 +34,7 @@ urlpatterns = [
     
     # Messages / Conversation
     path('<str:session_id>/messages/', CareerMessageCreateView.as_view(), name='message_create'),
+    path('<str:session_id>/messages/stream/', CareerMessageStreamView.as_view(), name='message_stream'),
     path('<str:session_id>/messages/history/', CareerMessageHistoryView.as_view(), name='message_history'),
     
     # Recommendations

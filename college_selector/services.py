@@ -237,8 +237,11 @@ class CollegeSelectorService:
             for msg in messages
         ]
 
-    def process_message(self, session: CollegeSelectorSession, user_message: str) -> Dict[str, Any]:
-        """Process a user message and generate AI response."""
+    async def process_message_stream(self, session: CollegeSelectorSession, user_message: str):
+        """Asynchronous generator for streaming AI responses via SSE."""
+        import json
+        from asgiref.sync import sync_to_async
+        
         current_step = session.current_step
         new_step = current_step + 1
 
@@ -248,7 +251,7 @@ class CollegeSelectorService:
             language = session.user.settings.get('voice_language', 'en').lower()
 
         # Save user message
-        CollegeSelectorMessage.objects.create(
+        await sync_to_async(CollegeSelectorMessage.objects.create)(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
             type=MessageType.USER,
@@ -258,6 +261,7 @@ class CollegeSelectorService:
         session.current_step = new_step
         is_complete = False
         bot_response = ""
+        save_fields = ['current_step', 'updated_at']
 
         if new_step >= self.max_conversation_questions:
             is_complete = True
@@ -273,53 +277,83 @@ class CollegeSelectorService:
                 )
             session.total_steps = new_step
             session.current_phase = 'completed'
-            session.save(update_fields=['current_step', 'total_steps', 'current_phase', 'updated_at'])
+            save_fields.extend(['total_steps', 'current_phase'])
+            
+            yield f"data: {json.dumps({'delta': bot_response, 'is_complete': False})}\n\n"
         else:
             # Generate AI response
-            all_messages = self.get_session_messages(session)
-            user_profile = get_user_profile_data(session.user)
+            all_messages = await sync_to_async(self.get_session_messages)(session)
+            user_profile = await sync_to_async(get_user_profile_data)(session.user)
+            
+            bot_response_full = ""
             token_usage = {}
 
-            result = self.langchain_service.generate_response(
+            # Use LangChain astream for non-blocking delivery
+            async for chunk in self.langchain_service.astream_question(
+                current_step=new_step,
+                messages=all_messages,
                 preferences=session.preferences,
                 user_profile=user_profile,
-                messages=all_messages,
-                user_message=user_message,
                 token_usage=token_usage,
                 language=language,
-            )
-
-            bot_response = result["response"]
-            student_done = result.get("student_done", False)
-
-            if student_done:
-                is_complete = True
-                session.total_steps = new_step
-                session.current_phase = 'completed'
-                session.save(update_fields=['current_step', 'total_steps', 'current_phase', 'updated_at'])
-            else:
-                session.save(update_fields=['current_step', 'updated_at'])
-
-            self._save_token_usage(session, token_usage)
+            ):
+                bot_response_full += chunk
+                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False})}\n\n"
+            
+            bot_response = bot_response_full
+            
+            # Check for implicit conclusion in non-streaming result if needed, 
+            # but for now we rely on the background check or hard cap.
+            # We'll fire the background check after this.
+            
+            await sync_to_async(self._save_token_usage)(session, token_usage)
 
         # Save bot response
-        CollegeSelectorMessage.objects.create(
+        await sync_to_async(CollegeSelectorMessage.objects.create)(
             session=session,
             message_id=f"msg_{uuid.uuid4().hex[:8]}",
             type=MessageType.BOT,
             content=bot_response,
         )
 
+        await sync_to_async(session.save)(update_fields=save_fields)
+        
+        # Background check for next time
+        if not is_complete:
+            await sync_to_async(self.fire_conclusion_check)(session.session_id, new_step, session.user)
+            
+        yield f"data: {json.dumps({'delta': '', 'is_complete': True})}\n\n"
+
+    def process_message(self, session: CollegeSelectorSession, user_message: str) -> Dict[str, Any]:
+        """
+        Synchronous wrapper for process_message_stream.
+        """
+        import json
+        from asgiref.sync import async_to_sync
+
+        async def _collect_stream():
+            full_response = ""
+            async for chunk in self.process_message_stream(session, user_message):
+                if chunk.startswith("data: "):
+                    data = json.loads(chunk[6:])
+                    full_response += data.get('delta', '')
+            return full_response
+
+        bot_response = async_to_sync(_collect_stream)()
+        
+        # Refresh session to get latest state after stream updates
+        session.refresh_from_db()
+
         questions_completed = CollegeSelectorMessage.objects.filter(
             session=session, type=MessageType.USER
         ).count()
-        progress = min(100, int((questions_completed / max(session.total_steps, 1)) * 100))
+        progress = min(100, int((questions_completed / max(session.total_steps if session.total_steps > 0 else self.max_conversation_questions, 1)) * 100))
 
         return {
             'session_id': session.session_id,
             'bot_response': bot_response,
             'current_step': session.current_step,
-            'is_complete': is_complete,
+            'is_complete': session.current_phase == 'completed',
             'progress_percentage': progress,
             'questions_completed': questions_completed,
             'token_usage': session.token_usage or {},

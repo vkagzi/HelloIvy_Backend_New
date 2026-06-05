@@ -7,7 +7,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import models
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
+import json
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from apps.accounts.models import User
@@ -246,6 +247,48 @@ class CollegeSelectorSendMessageView(APIView):
             return Response(
                 {'error': f'Failed to process message: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class CollegeMessageStreamView(APIView):
+    """
+    Server-Sent Events (SSE) view for streaming college selector chatbot responses.
+    """
+    permission_classes = []
+
+    def get(self, request, session_id):
+        """
+        Supports streaming responses via GET with content query param.
+        """
+        try:
+            user = get_user_instance(request.user)
+            if not user:
+                return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+            content = request.query_params.get('content')
+            if not content:
+                return Response({'error': 'Content is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            session = college_selector_service.get_session_by_id(session_id)
+            if not session or not session.user or session.user.id != user.id:
+                return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            if not session.preferences_completed:
+                return Response(
+                    {'error': 'Please complete preferences before starting conversation'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            response = StreamingHttpResponse(
+                college_selector_service.process_message_stream(session, content),
+                content_type='text/event-stream'
+            )
+            response['Cache-Control'] = 'no-cache'
+            return response
+        except Exception as e:
+            return Response(
+                {'error': f'Streaming failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
