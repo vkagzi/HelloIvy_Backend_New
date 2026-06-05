@@ -89,6 +89,7 @@ RULES:
 - NEVER write options without parentheses like "... improving technical skills A or exploring alternative fields B?"
 - The entire question line (before options) must still be under 25 words
 - If the question is open-ended (no explicit choices), write it normally on one line without option labels
+- ALWAYS end the options list with a brief invitation for the student to explain their choice, e.g., " Feel free to explain your choice in more detail !" or similar.
 </output_verbosity_spec>
 """)
     .add_module_section("""

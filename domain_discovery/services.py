@@ -519,18 +519,6 @@ class DomainDiscoveryService:
             "personalized domain recommendations. Head over to see your results!"
         )
 
-        metadata = session.metadata or {}
-
-        # ── Pre-final answer handling ────────────────────────────
-        # If we already asked the pre-final question last turn,
-        # handle the user's response now before any conclusion checks.
-        if metadata.get('pre_final_asked') and not metadata.get('pre_final_answered'):
-            metadata['pre_final_answered'] = True
-            session.metadata = metadata
-            save_fields.append('metadata')
-            is_complete = True
-            bot_response = self._handle_pre_final_response(session, user_message)
-
         # ── Step 1: Check existing conclusion state ──────────────
         if not is_complete and session.is_completed:
             is_complete = True
@@ -553,24 +541,9 @@ class DomainDiscoveryService:
                 bot_response = CONCLUSION_MSG
             else:
                 # Persist last_checked_step even when not concluding
+                metadata = session.metadata or {}
+                session.metadata = metadata
                 save_fields.append('metadata')
-
-        # ── Pre-final question intercept ─────────────────────────
-        # If conclusion was just triggered but we haven't asked the
-        # pre-final question yet, ask it instead of concluding.
-        if is_complete and not metadata.get('pre_final_asked'):
-            is_complete = False
-            is_last_question = False
-            # Allow one more step for the user's answer to the pre-final Q
-            session.total_steps = new_step + 1
-            metadata['pre_final_asked'] = True
-            session.metadata = metadata
-            if 'total_steps' not in save_fields:
-                save_fields.append('total_steps')
-            if 'metadata' not in save_fields:
-                save_fields.append('metadata')
-            bot_response = PRE_FINAL_QUESTION
-            question_type = 'general'
 
         # ── Step 3: Generate response if not concluding ──────────
         if not is_complete and not bot_response:

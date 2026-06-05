@@ -325,8 +325,15 @@ class CareerDiscoveryService:
         if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
             language = session.user.settings.get('voice_language', 'en').lower()
 
-        PRE_FINAL_QUESTION_HI = (
-            "आज आपसे बात करके बहुत अच्छा लगा! इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?"
+        CONCLUSION_MSG_HI = (
+            "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। "
+            "मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"
+        )
+
+        CONCLUSION_MSG = CONCLUSION_MSG_HI if language == 'hi' else (
+            "Thank you for sharing all of that with me! 🎉 I've learned so much about "
+            "your interests and strengths. Let me analyze everything and prepare your "
+            "personalized career recommendations. Head over to see your results!"
         )
 
         ActivityLog.log(
@@ -342,76 +349,48 @@ class CareerDiscoveryService:
         )
 
         # Increment step
+        current_step = session.current_step
         new_step = current_step + 1
         session.current_step = new_step
 
-        PRE_FINAL_QUESTION = PRE_FINAL_QUESTION_HI if language == 'hi' else (
-            "It was fantastic talking to you today! Is there one final question "
-            "you wish to ask before we close our session?"
-        )
+        # Check if conversation is complete
+        is_complete = new_step >= self.total_steps
 
-        CONCLUSION_MSG = CONCLUSION_MSG_HI if language == 'hi' else (
-            "Thank you for sharing all of that with me! 🎉 I've learned so much about "
-            "your interests and strengths. Let me analyze everything and prepare your "
-            "personalized career recommendations. Head over to see your results!"
-        )
-
-        metadata = session.metadata or {}
-
-        # ── Pre-final answer handling ────────────────────────────
-        # If we already asked the pre-final question last turn,
-        # handle the user's response now.
-        if metadata.get('pre_final_asked') and not metadata.get('pre_final_answered'):
-            metadata['pre_final_answered'] = True
-            session.metadata = metadata
-            is_complete = True
-            bot_response = self._handle_pre_final_response(session, user_message)
+        if is_complete:
+            bot_response = CONCLUSION_MSG
         else:
-            # Check if conversation is complete
-            is_complete = new_step >= self.total_steps
-
-            if is_complete and not metadata.get('pre_final_asked'):
-                # Ask pre-final question instead of concluding
-                is_complete = False
-                session.total_steps = new_step + 1
-                metadata['pre_final_asked'] = True
-                session.metadata = metadata
-                bot_response = PRE_FINAL_QUESTION
-            elif is_complete:
-                bot_response = CONCLUSION_MSG
-            else:
-                # Get all messages for context
-                all_messages = self.get_session_messages(session)
+            # Get all messages for context
+            all_messages = self.get_session_messages(session)
+        
+            # Get user profile data for AI context
+            user_profile = get_user_profile_data(session.user)
             
-                # Get user profile data for AI context
-                user_profile = get_user_profile_data(session.user)
-                
-                # Get Stream & Subject Selection context
-                domain_context = self.get_domain_discovery_context(session)
-                # Attach pre-computed domain choices (set at session creation)
-                domain_context['domain_choices'] = session.metadata.get('domain_choices', {})
-                
-                # Token usage tracker for this request
-                token_usage = {}
+            # Get Stream & Subject Selection context
+            domain_context = self.get_domain_discovery_context(session)
+            # Attach pre-computed domain choices (set at session creation)
+            domain_context['domain_choices'] = session.metadata.get('domain_choices', {})
+            
+            # Token usage tracker for this request
+            token_usage = {}
 
-                user_name = get_user_display_name(
-                    None, session.user, 'there'
-                )
+            user_name = get_user_display_name(
+                None, session.user, 'there'
+            )
 
-                bot_response = self.langchain_service.generate_question(
-                    step=new_step,
-                    user_response=user_message,
-                    messages=all_messages,
-                    user_profile=user_profile,
-                    user_name=user_name,
-                    domain_context=domain_context,
-                    session_notes=session.notes or "",
-                    token_usage=token_usage,
-                    language=language,
-                )
-                
-                # Save token usage
-                self._save_token_usage(session, token_usage)
+            bot_response = self.langchain_service.generate_question(
+                step=new_step,
+                user_response=user_message,
+                messages=all_messages,
+                user_profile=user_profile,
+                user_name=user_name,
+                domain_context=domain_context,
+                session_notes=session.notes or "",
+                token_usage=token_usage,
+                language=language,
+            )
+            
+            # Save token usage
+            self._save_token_usage(session, token_usage)
 
         session.save()
 

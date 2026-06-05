@@ -165,46 +165,28 @@ class CareerDiscoveryHandler(BaseFeatureHandler):
 
             domain_selection_instructions = prompt_data["domain_selection_instructions"]
 
-            is_concluding = session_info.get('is_completed', False) or (current_step + 1 >= session_info.get('total_steps', 18))
-            pre_final_asked = session_info.get('pre_final_asked', False)
+            is_concluding = session_info.get('is_completed', False) or (current_step >= session_info.get('total_steps', 18))
 
             status_line = ''
             if is_concluding:
                 if language == 'hi':
-                    if not pre_final_asked:
-                        status_line = (
-                            '- STATUS: The session evaluation has determined we have gathered enough information. '
-                            'In your NEXT response, ask the student: "आज आपसे बात करके बहुत अच्छा लगा! '
-                            'इससे पहले कि हम अपना सत्र समाप्त करें, क्या कोई आखिरी सवाल है जो आप पूछना चाहते हैं?" '
-                            'Wait for their response before wrapping up. '
-                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
-                        )
-                    else:
-                        status_line = (
-                            '- STATUS: The pre-final question has already been asked. '
-                            'If the student asked a question, answer it briefly and warmly in Hindi Devanagari (2-3 sentences). '
-                            'Then wrap up the conversation in Hindi Devanagari: thank them for sharing, let them know their '
-                            'personalized career recommendations are being prepared, and say goodbye. '
-                            'Exact closing message: "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"'
-                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
-                        )
+                    status_line = (
+                        '- STATUS: The session is complete. Wrap up the conversation in Hindi Devanagari: '
+                        'thank the student for sharing, let them know their personalized career recommendations '
+                        'are being prepared, and say goodbye.\n'
+                        'Exact closing message: "मेरे साथ यह सब साझा करने के लिए धन्यवाद! 🎉 मैंने आपकी रुचियों और शक्तियों के बारे में बहुत कुछ सीखा है। मुझे हर चीज़ का विश्लेषण करने दें और आपकी व्यक्तिगत करियर सिफारिशें तैयार करने दें। अपने परिणाम देखने के लिए आगे बढ़ें!"\n'
+                        'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
+                    )
                 else:
-                    if not pre_final_asked:
-                        status_line = (
-                            '- STATUS: The session evaluation has determined we have gathered enough information. '
-                            'In your NEXT response, ask the student: "It was fantastic talking to you today! '
-                            'Is there one final question you wish to ask before we close our session?" '
-                            'Wait for their response before wrapping up. '
-                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. Do not shift to a more formal or robotic tone for the closing.'
-                        )
-                    else:
-                        status_line = (
-                            '- STATUS: The pre-final question has already been asked. '
-                            'If the student asked a question, answer it briefly and warmly (2-3 sentences). '
-                            'Then wrap up the conversation: thank them for sharing, let them know their '
-                            'personalized career recommendations are being prepared, and say goodbye. '
-                            'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation. The goodbye should feel natural and continuous, not like a different speaker.'
-                        )
+                    status_line = (
+                        '- STATUS: The session is complete. Wrap up the conversation: '
+                        'thank the student for sharing, let them know their personalized career recommendations '
+                        'are being prepared, and say goodbye.\n'
+                        'Exact closing message: "Thank you for sharing all of that with me! 🎉 I\'ve learned so much about '
+                        'your interests and strengths. Let me analyze everything and prepare your '
+                        'personalized career recommendations. Head over to see your results!"\n'
+                        'IMPORTANT: Maintain the exact same voice style, tone, pacing, and warmth you have been using throughout this conversation.'
+                    )
 
             instructions += f"""
 {domain_selection_instructions}
@@ -264,44 +246,18 @@ VOICE-SPECIFIC GUIDELINES:
             )
             logger.info(f"💾 Saved {message_type} voice message for career session {session_id}")
 
-            # Mark *pre_final_asked* when the AI actually delivers its
-            # response in a concluding session.  Setting it here — on the
-            # bot turn — ensures the instruction refresh triggered by the
-            # *previous* user turn carried the "please ask" STATUS, while
-            # the *next* user-turn refresh will carry "already asked".
             if role == 'assistant':
-                metadata = session.metadata or {}
-                approaching_end = (session.current_step + 1 >= session.total_steps)
-                if approaching_end and not session.is_completed and not metadata.get('pre_final_asked'):
-                    metadata['pre_final_asked'] = True
-                    session.metadata = metadata
-                    session.save(update_fields=['metadata'])
                 return None
 
             if role == 'user':
                 session.current_step += 1
                 update_fields = ['current_step', 'updated_at']
 
-                # Before marking complete, check if we need to ask the
-                # pre-final question first.
-                metadata = session.metadata or {}
                 if session.current_step >= session.total_steps and not session.is_completed:
-                    if not metadata.get('pre_final_asked'):
-                        # Extend by 1 step so the AI can ask the pre-final
-                        # question and the user can respond before completion.
-                        session.total_steps += 1
-                        update_fields.append('total_steps')
-                    else:
-                        session.is_completed = True
-                        update_fields.append('is_completed')
+                    session.is_completed = True
+                    update_fields.append('is_completed')
 
                 session.save(update_fields=update_fields)
-
-                approaching_end = (session.current_step + 1 >= session.total_steps)
-
-                # Refresh instructions when approaching the end
-                # so the AI receives the closing STATUS.
-                should_update = approaching_end or session.is_completed
 
                 return {
                     'type': 'session.progress',
@@ -310,7 +266,7 @@ VOICE-SPECIFIC GUIDELINES:
                     'questions_completed': session.current_step,
                     'progress_percentage': round((session.current_step / session.total_steps) * 100) if session.total_steps else 0,
                     'is_completed': session.is_completed,
-                    'should_update_instructions': should_update,
+                    'should_update_instructions': session.is_completed,
                 }
 
             return None
