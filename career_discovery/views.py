@@ -313,18 +313,20 @@ class CareerMessageStreamView(APIView):
                 )
 
             def sync_stream():
-                import asyncio
-                loop = asyncio.new_event_loop()
+                from asgiref.sync import async_to_sync
                 agen = career_discovery_service.process_message_stream(session, content)
-                try:
-                    while True:
-                        try:
-                            chunk = loop.run_until_complete(agen.__anext__())
-                            yield chunk
-                        except StopAsyncIteration:
-                            break
-                finally:
-                    loop.close()
+                
+                async def get_next():
+                    try:
+                        return await agen.__anext__(), False
+                    except StopAsyncIteration:
+                        return None, True
+                
+                while True:
+                    chunk, done = async_to_sync(get_next)()
+                    if done:
+                        break
+                    yield chunk
 
             return StreamingHttpResponse(
                 sync_stream(),
