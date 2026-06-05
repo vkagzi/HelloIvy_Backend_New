@@ -312,8 +312,24 @@ class CareerMessageStreamView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            def sync_stream():
+                from asgiref.sync import async_to_sync
+                agen = career_discovery_service.process_message_stream(session, content)
+                
+                async def get_next():
+                    try:
+                        return await agen.__anext__(), False
+                    except StopAsyncIteration:
+                        return None, True
+                
+                while True:
+                    chunk, done = async_to_sync(get_next)()
+                    if done:
+                        break
+                    yield chunk
+
             return StreamingHttpResponse(
-                career_discovery_service.process_message_stream(session, content),
+                sync_stream(),
                 content_type='text/event-stream'
             )
 

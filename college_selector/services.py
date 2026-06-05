@@ -335,8 +335,11 @@ class CollegeSelectorService:
             full_response = ""
             async for chunk in self.process_message_stream(session, user_message):
                 if chunk.startswith("data: "):
-                    data = json.loads(chunk[6:])
-                    full_response += data.get('delta', '')
+                    try:
+                        data = json.loads(chunk[6:].strip())
+                        full_response += data.get('delta', '')
+                    except (json.JSONDecodeError, ValueError):
+                        continue
             return full_response
 
         bot_response = async_to_sync(_collect_stream)()

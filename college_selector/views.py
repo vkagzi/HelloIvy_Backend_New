@@ -279,8 +279,24 @@ class CollegeMessageStreamView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            def sync_stream():
+                from asgiref.sync import async_to_sync
+                agen = college_selector_service.process_message_stream(session, content)
+                
+                async def get_next():
+                    try:
+                        return await agen.__anext__(), False
+                    except StopAsyncIteration:
+                        return None, True
+                
+                while True:
+                    chunk, done = async_to_sync(get_next)()
+                    if done:
+                        break
+                    yield chunk
+
             response = StreamingHttpResponse(
-                college_selector_service.process_message_stream(session, content),
+                sync_stream(),
                 content_type='text/event-stream'
             )
             response['Cache-Control'] = 'no-cache'
