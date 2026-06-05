@@ -440,6 +440,7 @@ NEVER ask generic questions like "What motivates you?", "What kind of work do yo
 Respond with ONLY the question text. No JSON, no prefixes, no explanations - just the raw question.""")
     .build()
 )
+CONVERSATION_SYSTEM_PROMPT = DEEPDIVE_QUESTION_GENERATION_PROMPT
 
 
 RECOMMENDATIONS_SYSTEM_PROMPT = f"""You are an expert Stream & Subject Selection counselor for students aged 14-22. Analyze the conversation to recommend EXACTLY 5 career domains.

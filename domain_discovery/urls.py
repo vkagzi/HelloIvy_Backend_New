@@ -4,6 +4,7 @@ from .views import (
     DomainSessionListView,
     DomainSessionDetailView,
     DomainMessageCreateView,
+    DomainMessageStreamView,
     DomainMessageHistoryView,
     DomainSessionEndView,
     DomainSessionPauseView,
@@ -39,6 +40,7 @@ urlpatterns = [
     
     # Messages / Conversation
     path('<str:session_id>/messages/', DomainMessageCreateView.as_view(), name='message_create'),
+    path('<str:session_id>/messages/stream/', DomainMessageStreamView.as_view(), name='message_stream'),
     path('<str:session_id>/messages/history/', DomainMessageHistoryView.as_view(), name='message_history'),
     
     # Recommendations

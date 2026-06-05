@@ -6,6 +6,7 @@ from .views import (
     CollegeSelectorSessionDetailView,
     CollegeSelectorSavePreferencesView,
     CollegeSelectorSendMessageView,
+    CollegeMessageStreamView,
     CollegeSelectorMessageHistoryView,
     CollegeSelectorSessionEndView,
     CollegeSelectorSessionPauseView,
@@ -44,6 +45,7 @@ urlpatterns = [
 
     # Messages / Conversation
     path('<str:session_id>/messages/', CollegeSelectorSendMessageView.as_view(), name='message_create'),
+    path('<str:session_id>/messages/stream/', CollegeMessageStreamView.as_view(), name='message_stream'),
     path('<str:session_id>/messages/history/', CollegeSelectorMessageHistoryView.as_view(), name='message_history'),
 
     # Recommendations

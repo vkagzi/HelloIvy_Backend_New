@@ -3,12 +3,13 @@ Stream & Subject Selection API Views
 Provides REST API endpoints for Stream & Subject Selection conversations using LangChain + Azure OpenAI
 """
 import jwt
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from .models import ModuleReview
 
@@ -265,6 +266,62 @@ class DomainMessageCreateView(APIView):
             return Response(
                 {'error': f'Failed to process message: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DomainMessageStreamView(APIView):
+    """Streaming version of message creation using SSE"""
+    permission_classes = []
+
+    @extend_schema(
+        summary="Stream Message in Stream & Subject Selection",
+        description="Sends a user message and receives the AI response as a stream of Server-Sent Events (SSE).",
+        request=SendMessageRequestSerializer,
+        responses={
+            200: OpenApiResponse(description="Stream of SSE events"),
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Session not found"),
+        }
+    )
+    def post(self, request, session_id):
+        try:
+            user = get_user_instance(request.user)
+            if not user:
+                return HttpResponse(
+                    json.dumps({'error': 'Authentication required'}),
+                    status=401,
+                    content_type='application/json'
+                )
+
+            content = request.data.get('content')
+            if not content:
+                return HttpResponse(
+                    json.dumps({'error': 'Content is required'}),
+                    status=400,
+                    content_type='application/json'
+                )
+
+            session = domain_discovery_service.get_session_by_id(session_id)
+            if not session or not session.user or session.user.id != user.id:
+                return HttpResponse(
+                    json.dumps({'error': 'Session not found'}),
+                    status=404,
+                    content_type='application/json'
+                )
+
+            response = StreamingHttpResponse(
+                domain_discovery_service.process_message_stream(session, content),
+                content_type='text/event-stream'
+            )
+            response['Cache-Control'] = 'no-cache'
+            response['X-Accel-Buffering'] = 'no'  # Disable buffering for Nginx
+            return response
+
+        except Exception as e:
+            return HttpResponse(
+                json.dumps({'error': f'Failed to start stream: {str(e)}'}),
+                status=500,
+                content_type='application/json'
             )
 
 

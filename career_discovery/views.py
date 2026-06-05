@@ -2,6 +2,7 @@
 Career & Degree Selection API Views
 Provides REST API endpoints for Career & Degree Selection conversations using LangChain + Azure OpenAI
 """
+from django.http import StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -277,6 +278,44 @@ class CareerMessageCreateView(APIView):
             # Process the message
             result = career_discovery_service.process_message(session, content)
             return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to process message: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class CareerMessageStreamView(APIView):
+    """Streaming version of message creation"""
+    permission_classes = []
+
+    def post(self, request, session_id):
+        try:
+            content = request.data.get('content')
+            if not content:
+                return Response(
+                    {'error': 'content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            session = career_discovery_service.get_session_by_id(session_id)
+            if not session:
+                return Response(
+                    {'error': 'Career & Degree Selection session not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if session.is_completed:
+                return Response(
+                    {'error': 'This session has been completed.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            return StreamingHttpResponse(
+                career_discovery_service.process_message_stream(session, content),
+                content_type='text/event-stream'
+            )
 
         except Exception as e:
             return Response(

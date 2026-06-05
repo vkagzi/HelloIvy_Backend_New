@@ -496,48 +496,60 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
     
     async def listen_to_openai(self):
         """Listen for responses from OpenAI and forward to client"""
+        # Create a queue for processing messages in the background
+        # so forwarding to the client is never blocked by logging/processing.
+        process_queue = asyncio.Queue()
+
+        async def processor_task():
+            """Background worker to handle logging, token usage, and tool calls."""
+            while True:
+                message = await process_queue.get()
+                if message is None: # Shutdown signal
+                    break
+                try:
+                    data = json.loads(message)
+                    msg_type = data.get('type')
+                    
+                    # Capture user transcripts from audio transcription
+                    if msg_type == 'conversation.item.input_audio_transcription.completed':
+                        await self.log_message(data)
+                    # Capture assistant transcripts from audio responses
+                    elif msg_type == 'response.audio_transcript.done':
+                        if self._skip_logging_count > 0:
+                            self._skip_logging_count -= 1
+                            logger.info(f"⏭️ Skipped logging assistant response for session {self.session_id} (remaining skips: {self._skip_logging_count})")
+                        else:
+                            await self.log_message(data)
+                    # Accumulate token usage from completed responses
+                    elif msg_type == 'response.done':
+                        response_data = data.get('response', {})
+                        usage = response_data.get('usage')
+                        if usage and response_data.get('status') != 'cancelled':
+                            self._accumulate_token_usage(usage)
+                        # Process function calls in the response output
+                        for output_item in response_data.get('output', []):
+                            if output_item.get('type') == 'function_call':
+                                await self._process_tool_call(output_item)
+                except Exception as e:
+                    logger.error(f"❌ Error in background processor for session {self.session_id}: {e}")
+                finally:
+                    process_queue.task_done()
+
+        # Start the background processor
+        processor = asyncio.create_task(processor_task())
+
         try:
             provider = "OpenAI" if self._use_openai_direct else "Azure OpenAI"
             logger.info(f"🎧 Started listening to {provider} for session {self.session_id}")
             async for message in self.openai_ws:
-                # Forward all messages to client (ignore if client disconnected)
+                # 1. IMMEDIATE FORWARDING (TOP PRIORITY)
+                # We send to the client as fast as possible.
                 sent = await self.safe_send(message)
                 
-                # Parse and handle specific events
+                # 2. ASYNC PROCESSING (SECOND PRIORITY)
+                # Put in queue for background processing (logging, tools, etc.)
                 if sent:
-                    try:
-                        data = json.loads(message)
-                        msg_type = data.get('type')
-                        
-                        # Log significant events
-                        if msg_type in ['response.done', 'conversation.item.created', 'session.updated', 'session.created',
-                                        'conversation.item.input_audio_transcription.completed', 'response.audio_transcript.done']:
-                            logger.info(f"📨 OpenAI event: {msg_type} for session {self.session_id}")
-                        
-                        # Allow subclasses to handle message logging
-                        # Capture user transcripts from audio transcription
-                        if msg_type == 'conversation.item.input_audio_transcription.completed':
-                            await self.log_message(data)
-                        # Capture assistant transcripts from audio responses
-                        elif msg_type == 'response.audio_transcript.done':
-                            if self._skip_logging_count > 0:
-                                self._skip_logging_count -= 1
-                                logger.info(f"⏭️ Skipped logging assistant response for session {self.session_id} (remaining skips: {self._skip_logging_count})")
-                            else:
-                                await self.log_message(data)
-                        # Accumulate token usage from completed responses
-                        elif msg_type == 'response.done':
-                            response_data = data.get('response', {})
-                            usage = response_data.get('usage')
-                            if usage and response_data.get('status') != 'cancelled':
-                                self._accumulate_token_usage(usage)
-                            # Process function calls in the response output
-                            for output_item in response_data.get('output', []):
-                                if output_item.get('type') == 'function_call':
-                                    await self._process_tool_call(output_item)
-                        
-                    except json.JSONDecodeError:
-                        pass  # Non-JSON message, just forward
+                    await process_queue.put(message)
                 
         except websockets.exceptions.ConnectionClosed as e:
             logger.warning(
@@ -549,6 +561,10 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
         except Exception as e:
             logger.error(f"❌ Error listening to {provider} for session {self.session_id}: {e}", exc_info=True)
         finally:
+            # Shutdown processor
+            await process_queue.put(None)
+            await processor
+            
             # Mark the upstream connection as dead so receive() won't
             # attempt to write to a closed socket.
             self.openai_ws = None

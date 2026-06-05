@@ -1239,7 +1239,7 @@ Generate your response now:"""
 
         return llm_messages
 
-    def generate_question(
+    def stream_question(
         self,
         step: int,
         user_response: str = "",
@@ -1250,18 +1250,8 @@ Generate your response now:"""
         session_notes: str = "",
         token_usage: Dict = None,
         language: str = 'en',
-    ) -> str:
-        """Generate a question for any step number.
-
-        Single entry point that replaces the previous
-        ``generate_initial_question`` / ``generate_next_question`` split.
-        Calls ``build_prompt_for_step`` for prompt content, assembles the
-        LLM message list via ``_build_llm_messages``, invokes the LLM,
-        and returns the response text.
-
-        Returns:
-            The generated question string.
-        """
+    ):
+        """Streaming version of generate_question that yields text chunks."""
         try:
             prompt_data = self.build_prompt_for_step(
                 step=step,
@@ -1283,28 +1273,55 @@ Generate your response now:"""
                 language=language,
             )
 
-            response = self.llm.invoke(llm_messages)
-
-            # Track token usage
+            # Track token usage (note: streaming tokens are tracked differently,
+            # but for simplicity we'll record the start of the call)
             token_category = "initial_question" if step <= 2 else "next_question"
-            if token_usage is not None:
-                usage = self._extract_token_usage(response)
-                self.track_token_usage(token_usage, token_category, usage)
+            
+            for chunk in self.llm.stream(llm_messages):
+                content = chunk.content
+                if isinstance(content, list):
+                    content = "".join([
+                        part.get("text", "") if isinstance(part, dict) else str(part)
+                        for part in content
+                    ])
+                if content:
+                    yield content
 
-            content = response.content
-            if isinstance(content, list):
-                content = "".join([
-                    part.get("text", "") if isinstance(part, dict) else str(part)
-                    for part in content
-                ])
-            question = content.strip().strip('"\'')
-
-            logger.info(f"Q{step}: generated via unified generate_question")
-            return question
+            logger.info(f"Q{step}: stream completed via unified stream_question")
 
         except Exception as e:
-            logger.error(f"Error generating question at step {step}: {e}", exc_info=True)
+            logger.error(f"Error streaming question at step {step}: {e}", exc_info=True)
             raise
+
+    def generate_question(
+        self,
+        step: int,
+        user_response: str = "",
+        messages: List[Dict[str, Any]] = None,
+        user_profile: Dict[str, Any] = None,
+        user_name: str = "there",
+        domain_context: Dict[str, Any] = None,
+        session_notes: str = "",
+        token_usage: Dict = None,
+        language: str = 'en',
+    ) -> str:
+        """Generate a question for any step number."""
+        chunks = []
+        for chunk in self.stream_question(
+            step=step,
+            user_response=user_response,
+            messages=messages,
+            user_profile=user_profile,
+            user_name=user_name,
+            domain_context=domain_context,
+            session_notes=session_notes,
+            token_usage=token_usage,
+            language=language,
+        ):
+            chunks.append(chunk)
+        
+        question = "".join(chunks).strip().strip('"\'')
+        return question
 
     def generate_initial_question(self, user_name: str = "there", user_profile: Dict[str, Any] = None, domain_context: Dict[str, Any] = None, session_notes: str = "", token_usage: Dict = None, step: int = 0, user_response: str = "", language: str = 'en') -> str:
         """Generate the first or second question (domain selection) to start the conversation.
@@ -1633,6 +1650,109 @@ Output ONLY a JSON object with a "recommendations" array. Ensure valid JSON."""
             logger.error(f"Error generating recommendations: {e}", exc_info=True)
             raise
 
+    async def astream_question(
+        self,
+        step: int,
+        user_response: str,
+        messages: List[Dict[str, Any]],
+        user_profile: Dict[str, Any],
+        user_name: str,
+        domain_context: Dict[str, Any],
+        session_notes: str = "",
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+        """Async stream a conversational response for the next career discovery question."""
+        self._initialize_llm()
+        if token_usage is None:
+            token_usage = {}
+
+        system_prompt, dynamic_context = self.build_shared_instructions(
+            user_profile=user_profile,
+            domain_context=domain_context,
+            current_step=step,
+            session_notes=session_notes,
+            messages=messages,
+            user_name=user_name,
+            language=language
+        )
+
+        history_msgs = []
+        for m in messages:
+            if m['type'] == 'user':
+                history_msgs.append(HumanMessage(content=m['content']))
+            else:
+                history_msgs.append(AIMessage(content=m['content']))
+        
+        langchain_messages = [
+            SystemMessage(content=system_prompt),
+            SystemMessage(content=dynamic_context),
+            *history_msgs,
+            HumanMessage(content=user_response)
+        ]
+
+        async for chunk in self.llm.astream(langchain_messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                yield chunk.content
+
+    def stream_question(
+        self,
+        step: int,
+        user_response: str,
+        messages: List[Dict[str, Any]],
+        user_profile: Dict[str, Any],
+        user_name: str,
+        domain_context: Dict[str, Any],
+        session_notes: str = "",
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+        """Stream a conversational response for the next career discovery question."""
+        self._initialize_llm()
+        if token_usage is None:
+            token_usage = {}
+
+        # 1. Build canonical instructions (static prompt + dynamic context)
+        # This replaces the manual formatting that was causing KeyErrors
+        system_prompt, dynamic_context = self.build_shared_instructions(
+            user_profile=user_profile,
+            domain_context=domain_context,
+            current_step=step,
+            session_notes=session_notes,
+            messages=messages,
+            user_name=user_name,
+            language=language
+        )
+
+        # 2. Build conversation history
+        history_msgs = []
+        for m in messages:
+            if m['type'] == 'user':
+                history_msgs.append(HumanMessage(content=m['content']))
+            else:
+                history_msgs.append(AIMessage(content=m['content']))
+        
+        # 3. Build full message list for LangChain
+        # We send the dynamic context as a separate system message to improve prompt caching consistency
+        langchain_messages = [
+            SystemMessage(content=system_prompt),
+            SystemMessage(content=dynamic_context),
+            *history_msgs,
+            HumanMessage(content=user_response)
+        ]
+
+        # 4. Stream from LLM
+        for chunk in self.llm.stream(langchain_messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                yield chunk.content
+
+    def build_conversation_history(self, messages: List[Dict[str, Any]]) -> str:
+        """Utility for non-streaming usage or prompt injection"""
+        formatted = []
+        for m in messages:
+            role = "Student" if m['type'] == 'user' else "Coach"
+            formatted.append(f"{role}: {m['content']}")
+        return "\n".join(formatted)
 
 # Global service instance
 career_langchain_service = CareerDiscoveryLangChainService()

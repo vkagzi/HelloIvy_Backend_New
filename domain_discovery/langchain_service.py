@@ -38,6 +38,7 @@ from .prompts import (
     FORMATTED_DOMAINS_WITH_DESC,
     FORMATTED_DOMAINS_SIMPLE,
     FORMATTED_DOMAINS_BULLET_DESC,
+    CONVERSATION_SYSTEM_PROMPT,
 )
 
 # Always use Azure OpenAI for Stream & Subject Selection (matches Career & Degree Selection )
@@ -577,7 +578,7 @@ Generate the opening message:"""
 
         return llm_messages
 
-    def generate_question(
+    def stream_question(
         self,
         step: int,
         user_response: str = None,
@@ -589,17 +590,8 @@ Generate the opening message:"""
         token_usage: Dict = None,
         user_name: str = "",
         language: str = 'en',
-    ) -> Dict[str, Any]:
-        """Generate a question for any step number.
-
-        Single entry point that replaces the previous
-        ``generate_initial_question`` / ``generate_deepdive_question`` split.
-        Calls ``build_prompt_for_step`` for prompt content, assembles the
-        LLM message list, invokes the LLM, and returns the response.
-
-        Returns:
-            dict with ``question`` (str).
-        """
+    ):
+        """Stream a question for any step number."""
         try:
             prompt_data = self.build_prompt_for_step(
                 step=step,
@@ -620,34 +612,64 @@ Generate the opening message:"""
             # Log LLM messages (sanitized)
             log_llm_messages(logger, llm_messages)
 
-            response = self.llm.invoke(llm_messages)
+            # Stream chunks from the LLM
+            full_content = ""
+            for chunk in self.llm.stream(llm_messages):
+                content = chunk.content
+                if isinstance(content, list):
+                    delta = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
+                else:
+                    delta = str(content)
+                
+                if delta:
+                    full_content += delta
+                    yield delta
 
-            # Handle content being a list (content blocks) or plain string
-            raw_content = response.content
-            if isinstance(raw_content, list):
-                question_text = " ".join(
-                    block.get("text", "") if isinstance(block, dict) else str(block)
-                    for block in raw_content
-                ).strip()
-            else:
-                question_text = raw_content.strip()
-
-            # Track token usage
-            token_category = "initial_question" if step == 1 else "deepdive_question"
-            if token_usage is not None and response is not None:
-                usage = self._extract_token_usage(response)
-                self.track_token_usage(token_usage, token_category, usage)
-
-            # Strip any accidental JSON wrapper or quotes
-            question_text = question_text.strip('"').strip("'").strip()
-
-            logger.info(f"Q{step}: generated via unified generate_question")
-
-            return {"question": question_text}
+            # Track token usage after stream completes (optional, if usage_metadata is available in last chunk)
+            # For simplicity, we stick to non-streaming calls for strict token tracking if needed,
+            # but LangChain increasingly provides this in the stream as well.
 
         except Exception as e:
-            logger.error(f"Error generating question at step {step}: {e}", exc_info=True)
+            logger.error(f"Error streaming question at step {step}: {e}", exc_info=True)
             raise
+
+    def generate_question(
+        self,
+        step: int,
+        user_response: str = None,
+        messages: List[Dict[str, Any]] = None,
+        user_profile: Dict[str, Any] = None,
+        min_questions: int = 25,
+        max_questions: int = 35,
+        session_notes: str = "",
+        token_usage: Dict = None,
+        user_name: str = "",
+        language: str = 'en',
+    ) -> Dict[str, Any]:
+        """Generate a question for any step number.
+        
+        Returns:
+            dict with ``question`` (str).
+        """
+        chunks = list(self.stream_question(
+            step=step,
+            user_response=user_response,
+            messages=messages,
+            user_profile=user_profile,
+            min_questions=min_questions,
+            max_questions=max_questions,
+            session_notes=session_notes,
+            token_usage=token_usage,
+            user_name=user_name,
+            language=language
+        ))
+        question_text = "".join(chunks)
+        
+        # Strip any accidental JSON wrapper or quotes
+        question_text = question_text.strip('"').strip("'").strip()
+        
+        logger.info(f"Q{step}: generated via unified generate_question")
+        return {"question": question_text}
 
     def evaluate_conclusion(
         self,
@@ -984,6 +1006,113 @@ Rules:
         except Exception as e:
             logger.error(f"Error extracting interests with LLM: {e}", exc_info=True)
             raise
+
+    async def astream_question(
+        self,
+        current_step: int,
+        messages: List[Dict[str, Any]],
+        user_message: str,
+        user_profile: Dict[str, Any],
+        min_questions: int = 15,
+        max_questions: int = 25,
+        user_name: str = "",
+        session_notes: str = "",
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+        """Async stream a conversational response for the next domain discovery question."""
+        self._initialize_llm()
+        if token_usage is None:
+            token_usage = {}
+
+        # 1. Build context
+        history = self.format_conversation_history(messages, max_messages=15)
+        
+        # Assemble the proper system prompt based on whether it's RIASEC or Deep Dive
+        # (Simplified logic mirroring process_message)
+        system_prompt = CONVERSATION_SYSTEM_PROMPT.format(
+            current_question_number=current_step,
+            min_questions=min_questions,
+            max_questions=max_questions,
+            user_profile_context=format_user_profile_context(user_profile, user_name=user_name),
+            predefined_domains=FORMATTED_DOMAINS_SIMPLE,
+        )
+
+        if language == 'hi':
+            system_prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including greetings, questions, comparison highlights, "
+                "and acknowledgments, must be written in clear, warm, and natural Devanagari Hindi text. "
+                "Ensure your streamed response is warm and conversational. "
+                "Speak directly to the student in a supportive, encouraging manner.]"
+            )
+
+        langchain_messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"Context from previous turns:\n{history}\n\nStudent message: {user_message}")
+        ]
+
+        async for chunk in self.llm.astream(langchain_messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                yield chunk.content
+
+    def stream_question(
+        self,
+        current_step: int,
+        messages: List[Dict[str, Any]],
+        user_message: str,
+        user_profile: Dict[str, Any],
+        min_questions: int = 15,
+        max_questions: int = 25,
+        user_name: str = "",
+        session_notes: str = "",
+        token_usage: Dict = None,
+        language: str = 'en',
+    ):
+
+        """Stream a conversational response for the next domain discovery question."""
+        self._initialize_llm()
+        if token_usage is None:
+            token_usage = {}
+
+        # 1. Build context
+        history = self.format_conversation_history(messages, max_messages=15)
+        
+        # Assemble the proper system prompt based on whether it's RIASEC or Deep Dive
+        # (Simplified logic mirroring process_message)
+        system_prompt = CONVERSATION_SYSTEM_PROMPT.format(
+            current_question_number=current_step,
+            min_questions=min_questions,
+            max_questions=max_questions,
+            user_profile_context=format_user_profile_context(user_profile, user_name=user_name),
+            predefined_domains=FORMATTED_DOMAINS_SIMPLE,
+        )
+
+        if language == 'hi':
+            system_prompt += (
+                "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
+                "Do NOT use English or Hinglish. Your response, including greetings, questions, comparison highlights, "
+                "and acknowledgments, must be written in clear, warm, and natural Devanagari Hindi text. "
+                "Ensure your streamed response is warm and conversational. "
+                "IMPORTANT: In streaming mode, DO NOT return JSON. Return ONLY the conversational text response directly.]"
+            )
+        else:
+            system_prompt += "\n\nIMPORTANT: In streaming mode, DO NOT return JSON. Return ONLY the conversational text (Markdown) response directly. Do NOT wrap it in a JSON object."
+
+        langchain_messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_message)
+        ]
+
+        # 2. Stream response
+        try:
+            for chunk in self.llm.stream(langchain_messages):
+                content = chunk.content
+                if content:
+                    yield content
+        except Exception as e:
+            logger.error(f"Error in stream_question: {e}", exc_info=True)
+            yield f"I apologize, but I encountered an error: {str(e)}"
 
     def _calculate_domain_alignments(
         self,
