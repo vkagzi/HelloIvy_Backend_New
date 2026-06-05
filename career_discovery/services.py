@@ -429,18 +429,23 @@ class CareerDiscoveryService:
         """
         Process a user message and generate the next question or finalize the conversation.
         """
-        bot_response = ""
-        is_complete = False
-        
+        from asgiref.sync import async_to_sync
+
+        async def _consume_stream():
+            resp = ""
+            complete = False
+            async for chunk_json in self.process_message_stream(session, user_message):
+                if chunk_json.startswith("data: "):
+                    try:
+                        data = json.loads(chunk_json[6:].strip())
+                        resp += data.get("delta", "")
+                        complete = data.get("is_complete", False)
+                    except json.JSONDecodeError:
+                        continue
+            return resp, complete
+
         # Consume the stream to get the full response for the sync API
-        for chunk_json in self.process_message_stream(session, user_message):
-            if chunk_json.startswith("data: "):
-                try:
-                    data = json.loads(chunk_json[6:].strip())
-                    bot_response += data.get("delta", "")
-                    is_complete = data.get("is_complete", False)
-                except json.JSONDecodeError:
-                    continue
+        bot_response, is_complete = async_to_sync(_consume_stream)()
 
         # Refresh token_usage from DB to include latest
         session.refresh_from_db(fields=['token_usage', 'current_step'])
