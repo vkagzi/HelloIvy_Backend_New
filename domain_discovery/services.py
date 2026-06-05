@@ -531,6 +531,9 @@ class DomainDiscoveryService:
                 save_fields.extend(['total_steps', 'metadata'])
                 bot_response = CONCLUSION_MSG
             else:
+                # Persist last_checked_step even when not concluding
+                metadata = session.metadata or {}
+                session.metadata = metadata
                 save_fields.append('metadata')
 
         # ── Pre-final question intercept ─────────────────────────
