@@ -28,7 +28,13 @@ from django.utils.decorators import method_decorator
 
 from .models import UserPayment, SchoolPayment
 from .payment_gateway import get_payment_gateway
-from .payment_views import _provision_user_subscriptions, _provision_school_subscriptions_with_students, _slim_webhook_payload, HDFC_TERMINAL_FAILURE_STATUSES
+from .payment_views import (
+    _provision_user_subscriptions, 
+    _provision_school_subscriptions_with_students, 
+    _slim_webhook_payload, 
+    HDFC_TERMINAL_FAILURE_STATUSES,
+    _send_payment_status_email
+)
 
 logger = logging.getLogger(__name__)
 
@@ -147,10 +153,11 @@ class HDFCWebhookView(APIView):
 
         if payment_type == "student":
             _provision_user_subscriptions(payment)
+            _send_payment_status_email(payment, "completed")
             logger.info(f"Student payment {payment.id} completed via webhook")
         else:
-            module_quantities = payment.metadata.get("module_quantities", {})
-            _provision_school_subscriptions_with_students(payment, module_quantities)
+            _provision_school_subscriptions_with_students(payment)
+            _send_payment_status_email(payment, "completed")
             logger.info(f"School payment {payment.id} completed via webhook")
 
     @staticmethod
@@ -159,4 +166,5 @@ class HDFCWebhookView(APIView):
         payment.metadata["webhook_received"] = True
         payment.metadata["webhook_payload"] = _slim_webhook_payload(payload)
         payment.save()
+        _send_payment_status_email(payment, "failed")
         logger.warning(f"Payment {payment.id} failed via webhook")

@@ -139,9 +139,144 @@ def send_payment_failed_email(
         "total_amount": total_amount,
         "currency": currency,
     }
-    if failure_reason:
-        dynamic_template_data["failure_reason"] = failure_reason
     send_email(to, subject, template_id=template_id, dynamic_template_data=dynamic_template_data)
+
+
+def send_payment_pending_email(
+    email: str,
+    user_name: str,
+    transaction_id: str,
+    payment_date: str,
+    modules: list[dict],
+    total_amount: str,
+    currency: str = "INR",
+) -> None:
+    """Send payment pending notification email."""
+    to = email
+    subject = "Payment Pending – HelloIvy.ai"
+    print(f"[EMAIL] Sending payment pending to {to}")
+    
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 32px; background: #ffffff; border: 1px solid #eeeeee; border-radius: 16px;">
+      <div style="text-align: center; margin-bottom: 32px;">
+        <span style="font-size: 28px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #7B0012;">ivy</span></span>
+      </div>
+      
+      <h2 style="color: #1a1a2e; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Payment Pending &#8987;</h2>
+      <p style="color: #555; font-size: 15px; line-height: 1.6;">Hi <strong>{user_name}</strong>,</p>
+      <p style="color: #555; font-size: 15px; line-height: 1.6;">Your payment for HelloIvy modules is currently pending. This can happen if the payment gateway is taking a bit longer to confirm the transaction.</p>
+      
+      <div style="margin-top: 24px; padding: 20px; background: #f9fafb; border-radius: 12px; border: 1px solid #edf2f7;">
+        <p style="margin: 0 0 8px; font-size: 14px; color: #718096;">Transaction Detail</p>
+        <p style="margin: 0 0 4px; font-size: 14px; color: #1a1a2e;"><strong>Order ID:</strong> {transaction_id}</p>
+        <p style="margin: 0 0 4px; font-size: 14px; color: #1a1a2e;"><strong>Amount:</strong> {total_amount} {currency}</p>
+        <p style="margin: 0; font-size: 14px; color: #1a1a2e;"><strong>Date:</strong> {payment_date}</p>
+      </div>
+
+      <p style="color: #555; font-size: 15px; line-height: 1.6; margin-top: 24px;">Don't worry! We'll automatically update your account once the payment is confirmed. If the amount was debited from your account but remains pending for more than 24 hours, please contact us.</p>
+
+      <div style="margin-top: 32px; text-align: center;">
+        <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #7B0012; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Check Status</a>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0;" />
+      <p style="color: #aaa; font-size: 12px; text-align: center;">HelloIvy &mdash; AI-Powered Career Guidance</p>
+    </div>
+    """
+    send_email(to, subject, html=html)
+
+
+def send_chatbot_report_email(
+    email: str,
+    student_name: str,
+    module_name: str,
+    transcript: list[dict],
+    recommendations: list[dict] = None,
+    session_id: str = None,
+    report_pdf: bytes | None = None
+) -> None:
+    """Send chatbot conversation transcript and report to the student."""
+    to = email
+    subject = f"Your {module_name} Report – HelloIvy.ai"
+    print(f"[EMAIL] Sending chatbot report to {to}")
+
+    # Format transcript
+    transcript_html = ""
+    for msg in transcript:
+        # Handle paired messages (Service structure)
+        bot_q = msg.get('bot_question') or msg.get('content')
+        user_a = msg.get('student_response') or ""
+        
+        if bot_q:
+            transcript_html += f"""
+            <div style="margin-bottom: 20px; padding: 16px; background-color: #f9f9f9; border-left: 4px solid #7B0012; border-radius: 8px;">
+                <p style="margin: 0 0 4px; font-size: 11px; font-weight: bold; color: #7B0012; text-transform: uppercase;">AI Coach</p>
+                <p style="margin: 0 0 12px; font-size: 14px; color: #333; line-height: 1.5; font-style: italic;">"{bot_q}"</p>
+            """
+            if user_a:
+                transcript_html += f"""
+                <p style="margin: 0 0 4px; font-size: 11px; font-weight: bold; color: #4f46e5; text-transform: uppercase;">You</p>
+                <p style="margin: 0; font-size: 14px; color: #333; line-height: 1.5;">{user_a}</p>
+                """
+            transcript_html += "</div>"
+
+    # Format recommendations
+    recommendations_html = ""
+    if recommendations:
+        recommendations_html += """
+        <div style="margin-top: 32px; padding: 24px; background: #fffafb; border: 1px solid #ffe4e8; border-radius: 12px;">
+            <h3 style="margin: 0 0 16px; color: #7B0012; font-size: 18px;">Key Recommendations</h3>
+        """
+        for rec in recommendations:
+            title = rec.get('career_title') or rec.get('domain_title') or rec.get('university_name') or "Recommendation"
+            match = rec.get('match_percentage', 0)
+            description = rec.get('description', '')
+            
+            recommendations_html += f"""
+            <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eee;">
+                <p style="margin: 0 0 4px; font-size: 15px; font-weight: bold; color: #1a1a2e;">{title} <span style="float: right; font-size: 13px; color: #059669;">{match}% Match</span></p>
+                <p style="margin: 0; font-size: 13px; color: #555;">{description}</p>
+            </div>
+            """
+        recommendations_html += "</div>"
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 32px; background: #ffffff; border: 1px solid #eeeeee; border-radius: 16px;">
+      <div style="text-align: center; margin-bottom: 32px;">
+        <span style="font-size: 28px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #7B0012;">ivy</span></span>
+      </div>
+      
+      <h2 style="color: #1a1a2e; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Your {module_name} Report is Ready! &#127881;</h2>
+      <p style="color: #555; font-size: 15px; line-height: 1.6;">Hi <strong>{student_name}</strong>,</p>
+      <p style="color: #555; font-size: 15px; line-height: 1.6;">Great job completing your discovery session! We've compiled your conversation and top recommendations below so you can refer back to them anytime.</p>
+
+      {recommendations_html}
+
+      <div style="margin-top: 32px;">
+        <h3 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px;">Conversation History</h3>
+        {transcript_html}
+      </div>
+
+      <div style="margin-top: 32px; text-align: center; padding: 24px; background: #f9fafb; border-radius: 12px;">
+        <p style="margin: 0 0 16px; font-size: 14px; color: #555;">You can also view your full interactive report on the HelloIvy dashboard.</p>
+        <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #7B0012; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Go to Dashboard</a>
+      </div>
+
+      <p style="color: #888; font-size: 13px; margin-top: 32px; text-align: center;">Best of luck with your journey!</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0;" />
+      <p style="color: #aaa; font-size: 12px; text-align: center;">HelloIvy &mdash; AI-Powered Career Guidance</p>
+    </div>
+    """
+
+    attachments = None
+    if report_pdf:
+        attachments = [{
+            "content": report_pdf,
+            "filename": f"HelloIvy_{module_name.replace(' ', '_')}_Report_{session_id}.pdf",
+            "mime_type": "application/pdf",
+        }]
+
+    send_email(to, subject, html=html, attachments=attachments)
 
 
 def send_email(
@@ -159,8 +294,9 @@ def send_email(
     if not SENDGRID_FROM_EMAIL:
         logger.warning("[EMAIL] SENDGRID_FROM_EMAIL is not configured; skipping email send.")
         return
-    if not subject:
-        logger.warning("[EMAIL] Subject is required; skipping email send.")
+    # Subject is required for plain HTML emails but templates supply their own
+    if not template_id and not subject:
+        logger.warning("[EMAIL] Subject is required for non-template emails; skipping email send.")
         return
     if not template_id and not html:
         logger.warning("[EMAIL] No template or HTML content provided; skipping email send.")
@@ -172,16 +308,21 @@ def send_email(
 
     try:
         from_email = Email(SENDGRID_FROM_EMAIL, name=SENDGRID_FROM_NAME)
-        message = Mail(
-            from_email=from_email,
-            to_emails=to,
-            subject=subject,
-            html_content=html
-        )
+
         if template_id:
+            # Use dynamic template — subject/html_content are driven by the template itself
+            message = Mail(from_email=from_email, to_emails=to)
             message.template_id = template_id
-        if dynamic_template_data:
-            message.dynamic_template_data = dynamic_template_data
+            if dynamic_template_data:
+                message.dynamic_template_data = dynamic_template_data
+        else:
+            # Plain HTML email
+            message = Mail(
+                from_email=from_email,
+                to_emails=to,
+                subject=subject,
+                html_content=html,
+            )
 
         if attachments:
             for att in attachments:
