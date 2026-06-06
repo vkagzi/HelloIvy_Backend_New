@@ -1192,16 +1192,17 @@ Generate your personalized opening:"""
                 "— e.g. B.Tech, B.S., B.A., BBA, B.Sc., B.E., B.Com.\n"
                 "Do NOT include Masters, MBA, M.S., M.Tech, PhD, or any other postgraduate degrees.\n"
             )
-        elif degree_filter == 'career_and_postgrad':
+        elif degree_filter == 'pg_only':
             return (
-                "\n=== DEGREE TYPE CONSTRAINT (CAREER + POSTGRAD) ===\n"
-                "The student has requested a career report WITH postgraduate degree options.\n"
-                "The 'degrees' array for EACH career recommendation MUST include BOTH:\n"
-                "  - At least 2 undergraduate (UG) degrees (B.Tech, B.S., B.A., BBA, etc.)\n"
-                "  - At least 2 postgraduate degrees (Masters, MBA, M.S., M.Tech, etc.)\n"
-                "Mix degree types meaningfully — show the full academic path from UG through to PG.\n"
+                "\n=== DEGREE TYPE CONSTRAINT (POSTGRAD OPTIONS FOR UG STUDENT) ===\n"
+                "This student is already enrolled in an undergraduate degree. They do NOT need UG degree suggestions.\n"
+                "The 'degrees' array for EACH career recommendation MUST contain ONLY postgraduate degrees:\n"
+                "  — Masters (M.S., M.A., M.Tech, M.Sc.), MBA, M.Phil, PhD, PG Diploma, etc.\n"
+                "Do NOT include any undergraduate degrees (B.Tech, B.S., B.A., BBA, etc.) — the student already has one or is doing one.\n"
+                "Show the full range of PG pathways relevant to the career.\n"
             )
         return ""  # 'all' — no constraint
+
 
     def _build_domain_career_focus(
         self,

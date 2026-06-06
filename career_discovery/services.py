@@ -614,28 +614,28 @@ class CareerDiscoveryService:
             degree_filter=degree_filter,
         )
 
-        # Post-process: for ug_only, strip out any non-UG degrees the AI may have included
+        # Post-process: strip incorrect degree types the AI may have included
         UG_KEYWORDS = ('b.', 'ba ', 'bs ', 'btech', 'b.tech', 'bsc', 'b.sc', 'bba', 'b.a', 'b.s', 'be ', 'b.e', 'bachelor', 'undergraduate', 'ug ')
         PG_KEYWORDS = ('m.', 'mba', 'ms ', 'm.s', 'ma ', 'm.a', 'mtech', 'm.tech', 'msc', 'm.sc', 'master', 'phd', 'ph.d', 'doctorate', 'postgrad', 'pg ')
         if degree_filter == 'ug_only':
+            # High school: keep only UG degrees
             for rec_data in recommendations_data:
-                filtered_degrees = []
-                for deg in rec_data.get('degrees', []):
-                    deg_name = (deg.get('degree', '') if isinstance(deg, dict) else str(deg)).lower()
-                    is_pg = any(kw in deg_name for kw in PG_KEYWORDS)
-                    if not is_pg:
-                        filtered_degrees.append(deg)
-                rec_data['degrees'] = filtered_degrees if filtered_degrees else rec_data.get('degrees', [])
+                filtered = [d for d in rec_data.get('degrees', [])
+                            if not any(kw in (d.get('degree', '') if isinstance(d, dict) else str(d)).lower() for kw in PG_KEYWORDS)]
+                rec_data['degrees'] = filtered if filtered else rec_data.get('degrees', [])
         elif degree_filter == 'career_only':
-            # Remove postgrad degrees — only keep UG-level degrees
+            # Career report only: keep only UG degrees
             for rec_data in recommendations_data:
-                filtered_degrees = []
-                for deg in rec_data.get('degrees', []):
-                    deg_name = (deg.get('degree', '') if isinstance(deg, dict) else str(deg)).lower()
-                    is_pg = any(kw in deg_name for kw in PG_KEYWORDS)
-                    if not is_pg:
-                        filtered_degrees.append(deg)
-                rec_data['degrees'] = filtered_degrees if filtered_degrees else rec_data.get('degrees', [])
+                filtered = [d for d in rec_data.get('degrees', [])
+                            if not any(kw in (d.get('degree', '') if isinstance(d, dict) else str(d)).lower() for kw in PG_KEYWORDS)]
+                rec_data['degrees'] = filtered if filtered else rec_data.get('degrees', [])
+        elif degree_filter == 'pg_only':
+            # UG student wants postgrad: strip ALL UG degrees, keep only PG
+            for rec_data in recommendations_data:
+                filtered = [d for d in rec_data.get('degrees', [])
+                            if any(kw in (d.get('degree', '') if isinstance(d, dict) else str(d)).lower() for kw in PG_KEYWORDS)]
+                rec_data['degrees'] = filtered if filtered else rec_data.get('degrees', [])
+
 
 
         # Store recommendations in database
