@@ -150,6 +150,7 @@ def send_payment_pending_email(
     modules: list[dict],
     total_amount: str,
     currency: str = "INR",
+    invoice_pdf: bytes | None = None,
 ) -> None:
     """Send payment pending notification email."""
     to = email
