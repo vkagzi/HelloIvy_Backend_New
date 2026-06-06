@@ -630,9 +630,54 @@ class CareerDiscoveryService:
                 'feasibility': rec.feasibility,
                 'skill_gaps': rec.skill_gaps,
                 'rank': rec.rank
-            }
-            for rec in recommendations
+            } for rec in recommendations
         ]
+
+    def get_conversation_transcript(self, session: CareerSession) -> Dict[str, Any]:
+        """Generate a formatted transcript of the conversation."""
+        try:
+            messages = self.get_session_messages(session)
+            user_name = get_user_display_name(None, session.user, 'Student')
+            
+            # Pair bot questions with student responses
+            transcript_messages = []
+            for i in range(0, len(messages), 2):
+                if i < len(messages) and i + 1 < len(messages):
+                    bot_msg = messages[i]
+                    user_msg = messages[i + 1]
+                    
+                    if bot_msg.get('type') == 'bot' and user_msg.get('type') == 'user':
+                        question_num = (i // 2) + 1
+                        transcript_messages.append({
+                            'question_number': question_num,
+                            'bot_question': bot_msg.get('content', ''),
+                            'student_response': user_msg.get('content', ''),
+                            'timestamp': user_msg.get('timestamp')
+                        })
+
+            # Check for trailing bot message (conclusion)
+            concluding_message = None
+            if len(messages) % 2 == 1:
+                last_msg = messages[-1]
+                if last_msg.get('type') == 'bot':
+                    concluding_message = last_msg.get('content', '')
+
+            return {
+                'session_id': session.session_id,
+                'student_name': user_name,
+                'started_at': session.created_at.isoformat(),
+                'completed_at': session.updated_at.isoformat() if session.updated_at else None,
+                'total_questions': len(transcript_messages),
+                'messages': transcript_messages,
+                'concluding_message': concluding_message,
+            }
+        except Exception as e:
+            print(f"Error generating transcript: {e}")
+            return {
+                'session_id': session.session_id,
+                'student_name': get_user_display_name(None, session.user, 'Student'),
+                'error': str(e)
+            }
 
 
 # Global service instance

@@ -40,7 +40,7 @@ _LOGO_PATH = os.path.join(os.path.dirname(__file__), "logo_app.png")
 class InvoiceLineItem:
     module: str
     quantity: int
-    price: int  # unit price in minor-denomination (e.g. INR whole rupees)
+    price: float  # unit price
 
 
 @dataclass
@@ -54,12 +54,12 @@ class InvoiceData:
     address: str = ""
     gst_number: str = ""
     line_items: list[InvoiceLineItem] = field(default_factory=list)
-    subtotal: int = 0
-    discount: int = 0
+    subtotal: float = 0.0
+    discount: float = 0.0
     discount_code: str | None = None
-    tax: int = 0
+    tax: float = 0.0
     tax_label: str = "IGST (18%)"
-    total: int = 0
+    total: float = 0.0
     currency: str = "INR"
     transaction_id: str = ""
     status: str = ""
@@ -67,16 +67,23 @@ class InvoiceData:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
-def _fmt_inr(amount: int) -> str:
-    """Format amount as 'Rs 1,23,456.00' (Indian grouping)."""
+def _fmt_currency_pdf(amount: float, currency: str = "INR") -> str:
+    """Format amount with currency symbol and appropriate grouping."""
+    symbol = "$" if currency == "USD" else "Rs"
+    
+    # Simple grouping for USD, Indian grouping for INR
+    if currency == "USD":
+        return f"{symbol} {amount:,.2f}"
+    
+    # Indian grouping logic for INR
     s = f"{amount:,.2f}"
-    # Python's comma grouping uses Western style; convert to Indian.
     parts = s.split(".")
     integer_part = parts[0].replace(",", "")
     sign = ""
     if integer_part.startswith("-"):
         sign = "-"
         integer_part = integer_part[1:]
+    
     if len(integer_part) <= 3:
         grouped = integer_part
     else:
@@ -87,7 +94,8 @@ def _fmt_inr(amount: int) -> str:
             chunks.insert(0, rest[-2:])
             rest = rest[:-2]
         grouped = ",".join(chunks) + "," + last3
-    return f"Rs {sign}{grouped}.{parts[1]}"
+    
+    return f"{symbol} {sign}{grouped}.{parts[1]}"
 
 
 def _number_to_words(num: int) -> str:
@@ -309,9 +317,9 @@ def generate_invoice_pdf(data: InvoiceData) -> bytes:
         table_data.append([
             Paragraph(str(i), cell_style),
             Paragraph(_module_label(item.module), cell_style),
-            Paragraph(_fmt_inr(item.price), cell_r),
+            Paragraph(_fmt_currency_pdf(item.price, data.currency), cell_r),
             Paragraph(str(item.quantity), cell_c),
-            Paragraph(_fmt_inr(line_total), cell_r),
+            Paragraph(_fmt_currency_pdf(line_total, data.currency), cell_r),
         ])
 
     # Grand total row
@@ -365,10 +373,10 @@ def generate_invoice_pdf(data: InvoiceData) -> bytes:
         discount_label = f"Discount ({data.discount_code})"
 
     summary_rows = [
-        [Paragraph("Sub-Total", sum_label), Paragraph(_fmt_inr(data.subtotal), sum_value)],
-        [Paragraph(discount_label, sum_label), Paragraph(_fmt_inr(data.discount), sum_value)],
-        [Paragraph("Addon ()", sum_label), Paragraph(_fmt_inr(0), sum_value)],
-        [Paragraph(f"+ {data.tax_label}", sum_label), Paragraph(_fmt_inr(data.tax), sum_value)],
+        [Paragraph("Sub-Total", sum_label), Paragraph(_fmt_currency_pdf(data.subtotal, data.currency), sum_value)],
+        [Paragraph(discount_label, sum_label), Paragraph(_fmt_currency_pdf(data.discount, data.currency), sum_value)],
+        [Paragraph("Addon ()", sum_label), Paragraph(_fmt_currency_pdf(0, data.currency), sum_value)],
+        [Paragraph(f"+ {data.tax_label}", sum_label), Paragraph(_fmt_currency_pdf(data.tax, data.currency), sum_value)],
     ]
     sum_table = Table(summary_rows, colWidths=[page_width * 0.65, page_width * 0.35])
     sum_table.setStyle(TableStyle([
@@ -382,7 +390,7 @@ def generate_invoice_pdf(data: InvoiceData) -> bytes:
     gt_label_style = ParagraphStyle("GTLabel", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=11, textColor=MAROON, alignment=TA_RIGHT)
     gt_value_style = ParagraphStyle("GTValue", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=11, textColor=MAROON, alignment=TA_RIGHT)
     gt_table = Table(
-        [[Paragraph("Grand Total", gt_label_style), Paragraph(_fmt_inr(data.total), gt_value_style)]],
+        [[Paragraph("Grand Total", gt_label_style), Paragraph(_fmt_currency_pdf(data.total, data.currency), gt_value_style)]],
         colWidths=[page_width * 0.65, page_width * 0.35],
     )
     gt_table.setStyle(TableStyle([
@@ -395,7 +403,7 @@ def generate_invoice_pdf(data: InvoiceData) -> bytes:
 
     # Total in words
     words_style = ParagraphStyle("TotalWords", parent=styles["Normal"], fontName="Helvetica-Oblique", fontSize=7.5, textColor=colors.HexColor("#666666"), alignment=TA_RIGHT)
-    story.append(Paragraph(_number_to_words(data.total), words_style))
+    story.append(Paragraph(_number_to_words(int(data.total)), words_style))
 
     # ── Payment Terms ─────────────────────────────────────────────────
     story.append(Spacer(1, 18))

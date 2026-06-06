@@ -4,11 +4,15 @@ College Selector API Views
 import jwt
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from datetime import datetime
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import models
 from django.http import HttpResponse, StreamingHttpResponse
 import json
+import threading
+import queue
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from apps.accounts.models import User
@@ -36,6 +40,9 @@ from domain_discovery.models import DomainSession
 from career_discovery.models import CareerSession
 from utils.azure_openai import create_azure_openai_client
 from django.utils import timezone
+from utils.profile_formatting import format_user_profile_context
+from utils.email import send_chatbot_report_email
+from utils.report_pdf import generate_discovery_report_pdf, ReportData
 
 
 class CollegeSelectorDegreeOptionsView(APIView):
@@ -280,20 +287,35 @@ class CollegeMessageStreamView(APIView):
                 )
 
             def sync_stream():
-                from asgiref.sync import async_to_sync
-                agen = college_selector_service.process_message_stream(session, content)
-                
-                async def get_next():
-                    try:
-                        return await agen.__anext__(), False
-                    except StopAsyncIteration:
-                        return None, True
-                
+                q = queue.Queue()
+
+                def run_async():
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    async def consume():
+                        try:
+                            async for chunk in college_selector_service.process_message_stream(session, content):
+                                q.put(chunk)
+                        except Exception as e:
+                            q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
+                        finally:
+                            q.put(None)
+                    
+                    loop.run_until_complete(consume())
+                    loop.close()
+
+                thread = threading.Thread(target=run_async)
+                thread.start()
+
                 while True:
-                    chunk, done = async_to_sync(get_next)()
-                    if done:
+                    chunk = q.get()
+                    if chunk is None:
                         break
                     yield chunk
+
+                thread.join()
 
             response = StreamingHttpResponse(
                 sync_stream(),
@@ -439,6 +461,40 @@ class CollegeSelectorGenerateRecommendationsView(APIView):
             serializer = CollegeRecommendationSerializer(recommendations, many=True)
 
             session.refresh_from_db(fields=['token_usage'])
+
+            # Trigger email if not already sent
+            if not session.metadata.get('report_emailed'):
+                try:
+                    transcript = college_selector_service.get_transcript(session)
+                    recommendations = college_selector_service.get_recommendations(session)
+                    
+                    # Generate PDF report
+                    pdf_data = ReportData(
+                        student_name=user.first_name or "Student",
+                        module_name='College Selector',
+                        session_id=session.session_id,
+                        generated_at=datetime.now().isoformat(),
+                        transcript=transcript.get('messages', []),
+                        recommendations=recommendations
+                    )
+                    report_pdf = generate_discovery_report_pdf(pdf_data)
+
+                    send_chatbot_report_email(
+                        email=user.email,
+                        student_name=user.first_name or "Student",
+                        module_name='College Selector',
+                        transcript=transcript.get('messages', []),
+                        recommendations=serializer.data,
+                        session_id=session.session_id,
+                        report_pdf=report_pdf
+                    )
+                    
+                    # Mark as emailed
+                    session.metadata['report_emailed'] = True
+                    session.save(update_fields=['metadata'])
+                except Exception as email_err:
+                    print(f"Error triggering college chatbot report email: {email_err}")
+
             return Response({
                 'session_id': session.session_id,
                 'recommendations': serializer.data,
