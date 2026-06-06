@@ -120,7 +120,17 @@ class CareerRecommendationSchema(BaseModel):
         description="Feasibility rating (High/Medium/Low) for this career given the student's actual profile, skills, education, and constraints — with a brief evidence-based reason."
     )
     skill_gaps: List[str] = Field(
-        description="Top 5 specific skill or knowledge gaps the student currently has for this career, based on their profile and conversation. Each item should be a concrete, actionable gap (e.g. 'Python programming fundamentals', 'Statistical modelling knowledge', 'Public speaking confidence'). Exactly 5 items.",
+        description=(
+            "Top 5 personalised skill gaps for THIS specific student for this career. "
+            "Derived strictly as: (what this career requires day-to-day) MINUS (what this student already has based on their profile + conversation). "
+            "Each gap must: (1) reference the student's actual situation where relevant (e.g. their degree, internship, projects they mentioned), "
+            "(2) name the specific tool/method/knowledge they're missing — not a generic job description item, "
+            "(3) be phrased so the student reads it and thinks 'yes, that IS my gap'. "
+            "Format: short noun phrase (4-10 words). Ranked most-critical first. Exactly 5 items. "
+            "Do NOT list skills the student already mentioned having. "
+            "Bad example: 'Statistical inference skills'. "
+            "Good example: 'Statistics depth beyond your BSBE core curriculum' or 'Production SQL experience beyond class projects'."
+        ),
         min_length=5,
         max_length=5,
     )
@@ -1164,6 +1174,35 @@ Generate your personalized opening:"""
             "domain_selection_instructions": domain_selection_instructions,
         }
 
+    def _build_degree_filter_constraint(self, degree_filter: str) -> str:
+        """Build a degree-type constraint block to inject into the recommendations prompt."""
+        if degree_filter == 'ug_only':
+            return (
+                "\n=== DEGREE TYPE CONSTRAINT (HIGH SCHOOL STUDENT) ===\n"
+                "This student is currently in HIGH SCHOOL. The 'degrees' array for EACH career recommendation\n"
+                "MUST contain ONLY undergraduate (UG) degrees — e.g. B.Tech, B.S., B.A., BBA, B.Sc., B.E., B.Com.\n"
+                "Do NOT include any postgraduate degrees (Masters, MBA, M.S., M.Tech, PhD, etc.).\n"
+                "The student is not yet ready to consider postgraduate options.\n"
+            )
+        elif degree_filter == 'career_only':
+            return (
+                "\n=== DEGREE TYPE CONSTRAINT (CAREER REPORT ONLY) ===\n"
+                "The student has requested a CAREER REPORT ONLY — they do not want postgraduate degree options.\n"
+                "The 'degrees' array for EACH career recommendation MUST contain ONLY undergraduate (UG) degrees\n"
+                "— e.g. B.Tech, B.S., B.A., BBA, B.Sc., B.E., B.Com.\n"
+                "Do NOT include Masters, MBA, M.S., M.Tech, PhD, or any other postgraduate degrees.\n"
+            )
+        elif degree_filter == 'career_and_postgrad':
+            return (
+                "\n=== DEGREE TYPE CONSTRAINT (CAREER + POSTGRAD) ===\n"
+                "The student has requested a career report WITH postgraduate degree options.\n"
+                "The 'degrees' array for EACH career recommendation MUST include BOTH:\n"
+                "  - At least 2 undergraduate (UG) degrees (B.Tech, B.S., B.A., BBA, etc.)\n"
+                "  - At least 2 postgraduate degrees (Masters, MBA, M.S., M.Tech, etc.)\n"
+                "Mix degree types meaningfully — show the full academic path from UG through to PG.\n"
+            )
+        return ""  # 'all' — no constraint
+
     def _build_domain_career_focus(
         self,
         domain_context: Dict[str, Any],
@@ -1488,7 +1527,7 @@ Generate your response now:"""))
             logger.error(f"Error generating next question: {e}", exc_info=True)
             raise
 
-    def generate_recommendations(self, messages: List[Dict[str, Any]], user_profile: Dict[str, Any] = None, domain_context: Dict[str, Any] = None, token_usage: Dict = None) -> List[Dict[str, Any]]:
+    def generate_recommendations(self, messages: List[Dict[str, Any]], user_profile: Dict[str, Any] = None, domain_context: Dict[str, Any] = None, token_usage: Dict = None, degree_filter: str = 'all') -> List[Dict[str, Any]]:
         """Generate career recommendations based on the full conversation, user profile, Stream & Subject Selection results, and 10-agent evaluation.
         
         Recommendations are constrained to careers within the student's top 2
@@ -1569,6 +1608,7 @@ Each recommendation must clearly tie back to one of these focused domains.
 
 {domain_ctx}
 {domain_constraint}
+{self._build_degree_filter_constraint(degree_filter)}
 === CAREER EVALUATION DIMENSIONS ===
 {agent_context}
 
@@ -1587,6 +1627,7 @@ For each career, you must:
 2. Calculate weighted match_percentage using assessment weights
 3. Include agent_scores with individual evaluations
 4. Ground recommendations in domain results, profile data, and conversation
+
 
 Each item MUST include:
 
@@ -1610,11 +1651,11 @@ Each item MUST include:
     "reason": "1-2 sentence explanation citing specific factors from this student's actual profile, education, location, skills, or constraints."
   }},
   "skill_gaps": [
-    "Most critical skill gap — concrete and specific to this student",
-    "Second most critical skill gap",
-    "Third skill gap",
-    "Fourth skill gap",
-    "Fifth skill gap"
+    "Most critical gap — phrased using student's actual context (e.g. 'Stats depth beyond your BSBE curriculum')",
+    "Second gap — specific tool/method they're missing (e.g. 'Hands-on PyTorch beyond theoretical ML')",
+    "Third gap — tied to what career needs vs. their current level",
+    "Fourth gap — something they did NOT mention having in conversation",
+    "Fifth gap — least critical but still career-relevant delta"
   ],
   "agent_scores": {{
     "psychologist": 0-100,

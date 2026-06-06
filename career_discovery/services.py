@@ -160,7 +160,7 @@ class CareerDiscoveryService:
         session.token_usage = existing
         session.save(update_fields=['token_usage'])
 
-    def create_session(self, user, domain_session=None, primary_domain=None, secondary_domain=None) -> CareerSession:
+    def create_session(self, user, domain_session=None, primary_domain=None, secondary_domain=None, degree_preference: str = 'career_only') -> CareerSession:
         """Create a new Career & Degree Selection session for a user.
         
         Domain choices (primary_domain, secondary_domain) are selected by the user
@@ -193,13 +193,17 @@ class CareerDiscoveryService:
 
         # Create new session
         session_id = f"career_{uuid.uuid4().hex[:12]}"
+        # Validate degree_preference value
+        valid_preferences = ('career_only', 'career_and_postgrad')
+        if degree_preference not in valid_preferences:
+            degree_preference = 'career_only'
         session = CareerSession.objects.create(
             user=user,
             session_id=session_id,
             domain_session=domain_session,
             current_step=0,
             total_steps=self.total_steps,
-            metadata={'domain_choices': domain_choices},
+            metadata={'domain_choices': domain_choices, 'degree_preference': degree_preference},
         )
 
         ActivityLog.log(
@@ -567,17 +571,72 @@ class CareerDiscoveryService:
         domain_context = self.get_domain_discovery_context(session)
         domain_context['domain_choices'] = session.metadata.get('domain_choices', {})
 
+        # Derive degree filter based on student's academic level and their chosen preference
+        # Academic level comes from the user's profile educational.academicLevel field
+        degree_filter = 'all'  # Default: show all degree types
+        academic_level = ''
+        try:
+            profile_data = user_profile.get('profile_data', {}) if isinstance(user_profile, dict) else {}
+            educational = profile_data.get('educational', {})
+            if not isinstance(educational, dict):
+                educational = {}
+            academic_level = (
+                educational.get('academicLevel', '')
+                or user_profile.get('academicLevel', '')
+                or ''
+            ).strip()
+        except Exception:
+            academic_level = ''
+
+        HIGH_SCHOOL_LEVEL = 'High School (8th\u201312th grade)'
+        if academic_level == HIGH_SCHOOL_LEVEL:
+            # High school students → ONLY show UG degrees in recommendations
+            degree_filter = 'ug_only'
+        else:
+            # Undergrad / PG / Working Professional → respect their stated preference
+            degree_pref = session.metadata.get('degree_preference', 'career_only')
+            if degree_pref == 'career_and_postgrad':
+                degree_filter = 'career_and_postgrad'
+            else:
+                degree_filter = 'career_only'  # default: no postgrad
+
+        print(f"[DEGREE FILTER] academic_level='{academic_level}' | degree_preference='{session.metadata.get('degree_preference', 'career_only')}' | degree_filter='{degree_filter}'")
+
         # Token usage tracker for recommendations
         token_usage = {}
-
 
         # Generate recommendations via LangChain service
         recommendations_data = self.langchain_service.generate_recommendations(
             all_messages, 
             user_profile,
             domain_context,
-            token_usage=token_usage
+            token_usage=token_usage,
+            degree_filter=degree_filter,
         )
+
+        # Post-process: for ug_only, strip out any non-UG degrees the AI may have included
+        UG_KEYWORDS = ('b.', 'ba ', 'bs ', 'btech', 'b.tech', 'bsc', 'b.sc', 'bba', 'b.a', 'b.s', 'be ', 'b.e', 'bachelor', 'undergraduate', 'ug ')
+        PG_KEYWORDS = ('m.', 'mba', 'ms ', 'm.s', 'ma ', 'm.a', 'mtech', 'm.tech', 'msc', 'm.sc', 'master', 'phd', 'ph.d', 'doctorate', 'postgrad', 'pg ')
+        if degree_filter == 'ug_only':
+            for rec_data in recommendations_data:
+                filtered_degrees = []
+                for deg in rec_data.get('degrees', []):
+                    deg_name = (deg.get('degree', '') if isinstance(deg, dict) else str(deg)).lower()
+                    is_pg = any(kw in deg_name for kw in PG_KEYWORDS)
+                    if not is_pg:
+                        filtered_degrees.append(deg)
+                rec_data['degrees'] = filtered_degrees if filtered_degrees else rec_data.get('degrees', [])
+        elif degree_filter == 'career_only':
+            # Remove postgrad degrees — only keep UG-level degrees
+            for rec_data in recommendations_data:
+                filtered_degrees = []
+                for deg in rec_data.get('degrees', []):
+                    deg_name = (deg.get('degree', '') if isinstance(deg, dict) else str(deg)).lower()
+                    is_pg = any(kw in deg_name for kw in PG_KEYWORDS)
+                    if not is_pg:
+                        filtered_degrees.append(deg)
+                rec_data['degrees'] = filtered_degrees if filtered_degrees else rec_data.get('degrees', [])
+
 
         # Store recommendations in database
         from .serializers import CareerRecommendationSerializer

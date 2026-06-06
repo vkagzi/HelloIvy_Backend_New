@@ -140,12 +140,14 @@ class CareerSessionCreateView(APIView):
                 except DomainSession.DoesNotExist:
                     pass  # Proceed without linking — domain session is optional
 
-            # Create career session with domain choices
+            # Create career session with domain choices and degree preference
+            degree_preference = request.data.get('degree_preference', 'career_only')
             session = career_discovery_service.create_session(
                 user=user,
                 domain_session=domain_session,
                 primary_domain=primary_domain,
                 secondary_domain=secondary_domain,
+                degree_preference=degree_preference,
             )
             serializer = CareerSessionSerializer(session)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

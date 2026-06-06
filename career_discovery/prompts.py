@@ -405,12 +405,33 @@ For each career recommendation, you MUST also provide:
      * **Medium**: The career is achievable but requires overcoming 1-2 significant gaps (e.g., acquiring a specific skill set, relocating, changing degree track). Doable with deliberate effort.
      * **Low**: There are substantial barriers — multiple missing prerequisites, significant financial constraints, geographic limitations, or fundamental profile mismatches that make this career genuinely hard to achieve for this particular student.
    - "reason": A 1-2 sentence explanation tied DIRECTLY to the student's profile. Do NOT use generic statements — cite the specific factors (e.g., "Your IIT Kanpur engineering background directly prepares you for this role, and your ML project experience reduces the ramp-up time significantly.", or "You're still in Grade 10 without a clear coding background, so the path to this role requires 6-7 years of deliberate skill-building and education in computer science.").
-5. **skill_gaps**: A list of EXACTLY 5 strings — the top 5 specific skills or knowledge areas the student is currently missing for this particular career, based on what you know about their profile and conversation. These must be:
-   - Concrete and actionable (NOT generic like "more experience" — instead say "Hands-on experience with TensorFlow/PyTorch for deep learning" or "Statistical inference and hypothesis testing")
-   - Ranked from most critical to least critical
-   - Personalised to THIS student's actual gaps, not a generic list for the job title
-   - Written as short noun phrases (3-8 words each)
-   Examples: "Python and data manipulation skills", "Public speaking and client communication", "Financial modelling in Excel", "User research and usability testing methods", "Machine learning model deployment (MLOps)"
+5. **skill_gaps**: A list of EXACTLY 5 strings — highly personalised skill gaps derived using this strict 3-step process:
+
+   **STEP 1 — What does this career actually require?**
+   List the core technical and soft skills this specific career demands day-to-day (e.g., for Data Scientist: statistical modelling, Python/SQL, experiment design, business communication, ML deployment).
+
+   **STEP 2 — What does THIS specific student already have?**
+   Carefully audit their profile and conversation for evidence of existing skills:
+   - Their current degree/major (e.g., BSBE ≠ CS background, so less coding depth)
+   - Internship/work experience they mentioned (what they actually did there)
+   - Projects they talked about (tools used, complexity level)
+   - Skills they explicitly said they have or don't have
+   - Things they said they enjoy vs. struggle with
+   - Academic subjects, extracurriculars, competitions
+
+   **STEP 3 — Compute the real gap and phrase it in their context**
+   Gap = (Career Requires) MINUS (What this student already has). Then write each gap as a SHORT NOUN PHRASE that:
+   - References their situation if relevant (e.g., "Statistics depth beyond your BSBE curriculum", NOT just "Statistics")
+   - Calls out the specific tool/method they're missing (e.g., "Hands-on PyTorch beyond theoretical ML knowledge", NOT "ML frameworks")
+   - Is written so the student reads it and thinks "yes, that IS my gap" — not "that's just a job description"
+
+   STRICT RULES:
+   - Exactly 5 items. Ranked: most critical gap first.
+   - Each item: 4-10 words. Noun phrase only (no full sentences).
+   - NO generic job-description language (not "communication skills", not "data analysis experience")
+   - Every gap must be traceable to something specific in the student's profile OR something they said/did NOT say in the conversation
+   - If the student already mentioned a skill, do NOT list it as a gap
+   - Focus on the delta between where they are NOW vs. where the career needs them to be
 6. **degrees**: An array of 4-6 degree objects. Each degree object MUST include:
    - "degree": Degree name (e.g. "B.S. in Computer Science", "MBA", "B.A. in Psychology")
    - "fit_score": Integer 1-5 reflecting BOTH career relevance AND student profile alignment (interests, strengths, preferred subjects). Higher = better fit.
