@@ -244,45 +244,45 @@ class ModuleChoicesView(APIView):
     allow_public = True
 
     def get(self, request: Request) -> Response:
-        from .payment_views import FALLBACK_PRICES
-        # Build a global price lookup from the DB
-        global_prices = {
-            mp.module_name: int(mp.price)
-            for mp in ModulePricing.objects.filter(
-                school__isnull=True, user__isnull=True, is_active=True
-            )
-        }
-        default_price = 999
+        from .payment_views import FALLBACK_PRICES, get_module_price
+        # Optional currency override (e.g. ?currency=USD)
+        currency = (request.query_params.get("currency") or "INR").upper()
+
+        def get_price(module_name: str) -> float:
+            return get_module_price(module_name, currency=currency)
 
         modules = [
             {
                 "value": m.value,
                 "label": m.label,
-                "price": global_prices.get(m.value, FALLBACK_PRICES.get(m.value, default_price)),
+                "price": get_price(m.value),
                 **MODULE_META.get(m.value, {}),
             }
             for m in ModuleName
         ]
 
-        # Add custom modules from database
         from .models import CustomModule
+        pricing_module_names = set(ModulePricing.objects.filter(
+            school__isnull=True, user__isnull=True, is_active=True
+        ).values_list("module_name", flat=True))
+
         is_admin = False
-        user = request.user
+        user = getattr(request, "user", None)
         if user and user.is_authenticated:
             role = getattr(user, "role", None)
             is_admin = role in ("superadmin", "operationadmin")
 
         for cm in CustomModule.objects.all():
-            if cm.value in global_prices or is_admin:
+            if str(cm.value) in pricing_module_names or is_admin:
                 modules.append({
-                    "value": cm.value,
+                    "value": str(cm.value),
                     "label": cm.label,
-                    "price": global_prices.get(cm.value, default_price),
+                    "price": get_price(str(cm.value)),
                     "icon": cm.icon,
                     "color": cm.color,
                 })
 
-        return Response({"modules": modules}, status=200)
+        return Response({"modules": modules, "currency": currency}, status=200)
 
 
 class AcademicLevelsView(APIView):

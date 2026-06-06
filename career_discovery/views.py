@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+import threading
+import queue
 
 from apps.accounts.models import User
 from .models import CareerSession, CareerMessage, CareerRecommendation
@@ -26,6 +28,8 @@ from utils.user_helpers import get_user_instance
 from utils.profile_helpers import get_user_profile_data
 from utils.profile_formatting import format_user_profile_context
 from django.utils import timezone
+from utils.email import send_chatbot_report_email
+from utils.report_pdf import generate_discovery_report_pdf, ReportData
 
 
 class CareerDomainsListView(APIView):
@@ -315,20 +319,35 @@ class CareerMessageStreamView(APIView):
                 )
 
             def sync_stream():
-                from asgiref.sync import async_to_sync
-                agen = career_discovery_service.process_message_stream(session, content)
-                
-                async def get_next():
-                    try:
-                        return await agen.__anext__(), False
-                    except StopAsyncIteration:
-                        return None, True
-                
+                q = queue.Queue()
+
+                def run_async():
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    async def consume():
+                        try:
+                            async for chunk in career_discovery_service.process_message_stream(session, content):
+                                q.put(chunk)
+                        except Exception as e:
+                            q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
+                        finally:
+                            q.put(None)
+                    
+                    loop.run_until_complete(consume())
+                    loop.close()
+
+                thread = threading.Thread(target=run_async)
+                thread.start()
+
                 while True:
-                    chunk, done = async_to_sync(get_next)()
-                    if done:
+                    chunk = q.get()
+                    if chunk is None:
                         break
                     yield chunk
+
+                thread.join()
 
             return StreamingHttpResponse(
                 sync_stream(),
@@ -535,6 +554,40 @@ class CareerRecommendationsGenerateView(APIView):
             # Refresh session to get latest token usage
             session.refresh_from_db(fields=['token_usage'])
             
+            # Trigger email if not already sent
+            if not session.metadata.get('report_emailed'):
+                try:
+                    user = get_user_instance(request.user)
+                    transcript = career_discovery_service.get_conversation_transcript(session)
+                    recommendations = career_discovery_service.get_stored_recommendations(session)
+                    
+                    # Generate PDF report
+                    pdf_data = ReportData(
+                        student_name=user.first_name or "Student",
+                        module_name='Career & Degree Selection',
+                        session_id=session.session_id,
+                        generated_at=timezone.now().isoformat(),
+                        transcript=transcript.get('messages', []),
+                        recommendations=recommendations
+                    )
+                    report_pdf = generate_discovery_report_pdf(pdf_data)
+
+                    send_chatbot_report_email(
+                        email=user.email,
+                        student_name=user.first_name or "Student",
+                        module_name='Career & Degree Selection',
+                        transcript=transcript.get('messages', []),
+                        recommendations=recommendations,
+                        session_id=session.session_id,
+                        report_pdf=report_pdf
+                    )
+                    
+                    # Mark as emailed
+                    session.metadata['report_emailed'] = True
+                    session.save(update_fields=['metadata'])
+                except Exception as email_err:
+                    print(f"Error triggering career chatbot report email: {email_err}")
+
             return Response({
                 'session_id': session_id,
                 'recommendations': result,

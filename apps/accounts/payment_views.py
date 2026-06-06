@@ -22,7 +22,7 @@ from .models import User, School, UserPayment, SchoolPayment, UserModuleSubscrip
 from .serializers import UserPaymentSerializer, SchoolPaymentSerializer, SchoolModuleSubscriptionSerializer, UserModuleSubscriptionSerializer, ModulePricingSerializer, CouponSerializer
 from .services import get_module_usage_count_for_school, get_assigned_count_for_school
 from .payment_gateway import get_payment_gateway, PaymentGatewayException
-from utils.email import send_payment_success_email, send_payment_failed_email
+from utils.email import send_payment_success_email, send_payment_failed_email, send_payment_pending_email
 
 logger = logging.getLogger(__name__)
 
@@ -84,13 +84,15 @@ FALLBACK_PRICES = {
     "domain_discovery": 999,
 }
 
+from .currency_utils import get_usd_to_inr_rate
+
 
 def get_module_price(
     module_name: str,
-    school_id: int | None = None,
     user_id: int | None = None,
-    currency: str = "INR",
-) -> int:
+    school_id: int | None = None,
+    currency: str | None = None,
+) -> float:
     """Resolve price for a single module.
 
     Resolution order: user-specific → school-specific → global → fallback.
@@ -118,19 +120,32 @@ def get_module_price(
         ).first()
 
     if not pricing:
-        return FALLBACK_PRICES.get(module_name, DEFAULT_MODULE_PRICE)
+        price = FALLBACK_PRICES.get(module_name, DEFAULT_MODULE_PRICE)
+        if currency == "USD":
+            rate = get_usd_to_inr_rate()
+            return round(float(price) / rate, 2)
+        return round(float(price), 2)
 
-    if currency and currency != "INR" and pricing.currency_variants:
-        return int(pricing.currency_variants.get(currency, pricing.price))
+    base_price = float(pricing.price)
+    if currency and currency != "INR":
+        variants = pricing.currency_variants or {}
+        if currency in variants and variants[currency] is not None:
+            return round(float(variants[currency]), 2)
+        
+        # Automatic conversion if no variant is set
+        if currency == "USD":
+            rate = get_usd_to_inr_rate()
+            return round(base_price / rate, 2)
+        # Add other currencies if needed...
 
-    return int(pricing.price)
+    return round(base_price, 2)
 
 
 def get_all_module_prices(
-    school_id: int | None = None,
     user_id: int | None = None,
-    currency: str = "INR",
-) -> dict[str, int]:
+    school_id: int | None = None,
+    currency: str | None = None,
+) -> dict[str, float]:
     """Return a {module_name: price} dict for every active ModuleName."""
     return {
         m.value: get_module_price(m.value, school_id=school_id, user_id=user_id, currency=currency)
@@ -150,7 +165,7 @@ def _compute_order_totals(
     modules: list[str],
     quantities: dict[str, int],
     coupon_code: str | None = None,
-    prices: dict[str, int] | None = None,
+    prices: dict[str, float] | None = None,
 ) -> dict:
     """
     Compute subtotal, discount, tax, and grand total for an order.
@@ -159,9 +174,10 @@ def _compute_order_totals(
     """
     price_map = prices or {}
     subtotal = sum(
-        price_map.get(m, DEFAULT_MODULE_PRICE) * quantities.get(m, 1)
+        float(price_map.get(m, DEFAULT_MODULE_PRICE)) * quantities.get(m, 1)
         for m in modules
     )
+    subtotal = round(subtotal, 2)
     
     discount = 0.0
     applied_coupon_code = None
@@ -288,13 +304,18 @@ def _format_currency(amount: int | float, currency: str = "INR") -> str:
 
 
 def _build_module_list(payment) -> list[dict]:
-    """Build a [{name, price}] list from modules_purchased."""
+    """Build a [{name, price, quantity}] list from modules_purchased."""
     items = []
     for entry in payment.modules_purchased:
         module_name = entry["module"]
         label = module_name.replace("_", " ").title()
         price = entry.get("price")
-        items.append({"name": label, "price": _format_currency(price, payment.currency) if price else ""})
+        quantity = entry.get("quantity", 1)
+        items.append({
+            "name": label, 
+            "price": _format_currency(price, payment.currency) if price else "",
+            "quantity": quantity
+        })
     return items
 
 
@@ -437,6 +458,18 @@ def _send_payment_status_email(payment, status: str, gateway_status: str | None 
                 failure_reason=failure_reason,
             )
             logger.info(f"[PaymentEmail] FAILED email sent to {email} for payment {payment.id}")
+        elif status == "pending":
+            logger.info(f"[PaymentEmail] Sending PENDING email to {email}")
+            send_payment_pending_email(
+                email=email,
+                user_name=user_name,
+                transaction_id=transaction_id,
+                payment_date=payment_date,
+                modules=modules,
+                total_amount=_format_currency(payment.amount, currency),
+                currency=currency,
+            )
+            logger.info(f"[PaymentEmail] PENDING email sent to {email} for payment {payment.id}")
         else:
             logger.warning(f"[PaymentEmail] Unknown status={status} for payment {payment.id}; no email sent")
     except Exception:
@@ -493,8 +526,9 @@ class StudentCheckoutView(APIView):
         modules_purchased = [{"module": m, "quantity": q} for m, q in Counter(modules).items()]
         coupon_code = request.data.get("coupon_code")
         billing_state = request.data.get("billing_state", "")
+        currency = request.data.get("currency", PAYMENT_CURRENCY)
         quantities = dict(Counter(modules))
-        price_map = get_all_module_prices(user_id=user.id)
+        price_map = get_all_module_prices(user_id=user.id, currency=currency)
         order = _compute_order_totals(list(quantities.keys()), quantities, coupon_code, prices=price_map)
         total = order["total"]
 
@@ -510,11 +544,22 @@ class StudentCheckoutView(APIView):
             user=user,
             modules_purchased=modules_purchased,
             amount=total,
-            currency=PAYMENT_CURRENCY,
+            currency=currency,
             payment_gateway="hdfc",
         )
+        payment.metadata = {
+            "pricing": order,
+            "billing_state": billing_state,
+            "first_name": first_name or user.first_name,
+            "last_name": last_name or user.last_name,
+            "email": email or user.email,
+            "phone": phone,
+            "address": address,
+            "gst_number": gst_number,
+        }
         payment.set_status(UserPayment.Status.PENDING)
         payment.save()
+        _send_payment_status_email(payment, "pending")
 
         # If total is 0 (e.g. 100% discount), bypass gateway and provision immediately
         if total == 0:
@@ -581,7 +626,7 @@ class StudentCheckoutView(APIView):
             
             gateway_response = gateway.create_payment_order(
                 amount=total,
-                currency=PAYMENT_CURRENCY,
+                currency=currency,
                 metadata=gateway_metadata
             )
             
@@ -633,7 +678,7 @@ class StudentCheckoutView(APIView):
             "discount": order["discount"],
             "tax": order["tax"],
             "total": total,
-            "currency": PAYMENT_CURRENCY,
+            "currency": currency,
             "gateway": "hdfc",
             "transaction_id": payment.gateway_transaction_id,
             "payment_url": payment_url,
@@ -685,10 +730,13 @@ class UserPaymentListCreateView(UserDTOView):
         # Optional filters
         user_id = request.query_params.get("user_id")
         status = request.query_params.get("status")
+        currency = request.query_params.get("currency")
         if user_id:
             qs = qs.filter(user_id=user_id)
         if status:
             qs = qs.filter(status=status)
+        if currency:
+            qs = qs.filter(currency=currency)
 
         serializer = UserPaymentSerializer(qs, many=True)
         return Response({"payments": serializer.data, "total": qs.count()}, status=200)
@@ -764,10 +812,13 @@ class SchoolPaymentListCreateView(UserDTOView):
 
         school_id = request.query_params.get("school_id")
         status = request.query_params.get("status")
+        currency = request.query_params.get("currency")
         if school_id:
             qs = qs.filter(school_id=school_id)
         if status:
             qs = qs.filter(status=status)
+        if currency:
+            qs = qs.filter(currency=currency)
 
         serializer = SchoolPaymentSerializer(qs, many=True)
         return Response({"payments": serializer.data, "total": qs.count()}, status=200)
@@ -981,8 +1032,8 @@ class SchoolCheckoutView(UserDTOView):
         gst_number = request.data.get("gst_number", "")
 
         school = School.objects.get(id=self.user_dto.school_id)
-        school_currency = school.currency or "INR"
-        price_map = get_all_module_prices(school_id=school.id, currency=school_currency)
+        currency = request.data.get("currency", school.currency or "INR")
+        price_map = get_all_module_prices(school_id=school.id, currency=currency)
         order = _compute_order_totals(modules, module_quantities, coupon_code, prices=price_map)
         total = order["total"]
 
@@ -1056,7 +1107,7 @@ class SchoolCheckoutView(UserDTOView):
             
             gateway_response = gateway.create_payment_order(
                 amount=total,
-                currency=PAYMENT_CURRENCY,
+                currency=currency,
                 metadata=gateway_metadata
             )
             
@@ -1094,7 +1145,7 @@ class SchoolCheckoutView(UserDTOView):
             "discount": order["discount"],
             "tax": order["tax"],
             "total": total,
-            "currency": PAYMENT_CURRENCY,
+            "currency": currency,
             "gateway": "hdfc",
             "transaction_id": payment.gateway_transaction_id,
             "payment_url": payment_url,
