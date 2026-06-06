@@ -460,6 +460,10 @@ def _send_payment_status_email(payment, status: str, gateway_status: str | None 
             logger.info(f"[PaymentEmail] FAILED email sent to {email} for payment {payment.id}")
         elif status == "pending":
             logger.info(f"[PaymentEmail] Sending PENDING email to {email}")
+            
+            # Generate invoice PDF attachment for pending payments as well
+            invoice_pdf = _generate_payment_invoice(payment)
+            
             send_payment_pending_email(
                 email=email,
                 user_name=user_name,
@@ -468,7 +472,9 @@ def _send_payment_status_email(payment, status: str, gateway_status: str | None 
                 modules=modules,
                 total_amount=_format_currency(payment.amount, currency),
                 currency=currency,
+                invoice_pdf=invoice_pdf,
             )
+            logger.info(f"[PaymentEmail] PENDING email sent to {email} for payment {payment.id}")
             logger.info(f"[PaymentEmail] PENDING email sent to {email} for payment {payment.id}")
         else:
             logger.warning(f"[PaymentEmail] Unknown status={status} for payment {payment.id}; no email sent")
