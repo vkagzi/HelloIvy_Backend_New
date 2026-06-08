@@ -19,45 +19,14 @@ from .services import is_profile_complete
 from openai import AzureOpenAI
 from django.conf import settings
 
-import docx
+# import docx
 import fitz # PyMuPDF
 import easyocr
 import numpy as np
 import cv2
 from PIL import Image as PILImage
 
-def extract_docx(file):
-    doc = docx.Document(file)
-    full_text = []
-    
-    # Extract from headers
-    for section in doc.sections:
-        if section.header:
-            for para in section.header.paragraphs:
-                if para.text.strip():
-                    full_text.append(para.text)
-
-    # Extract from main body paragraphs
-    for para in doc.paragraphs:
-        if para.text.strip():
-            full_text.append(para.text)
-            
-    # Extract from tables
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for para in cell.paragraphs:
-                    if para.text.strip():
-                        full_text.append(para.text)
-                                   
-    # Extract from footers
-    for section in doc.sections:
-        if section.footer:
-            for para in section.footer.paragraphs:
-                if para.text.strip():
-                    full_text.append(para.text)
-
-    return "\n".join(full_text)
+# Removed docx extraction as it is no longer supported
 
 client = AzureOpenAI(
     api_key=settings.AZURE_OPENAI_API_KEY,
@@ -628,11 +597,38 @@ class ResumeParserView(UserDTOView):
         if file_name.endswith(".pdf"):
             text = pdfminer.high_level.extract_text(uploaded_file.file)
 
-        elif file_name.endswith(".docx"):
-            text = extract_docx(uploaded_file)
+        elif file_name.endswith((".jpg", ".jpeg")):
+            # Optimize image for Vision upload
+            print(f"Optimizing image for Resume Vision upload: {file_name}")
+            img = PILImage.open(uploaded_file).convert('RGB')
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=80)
+            img_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # Use Vision logic for resume if image
+            response = client.chat.completions.create(
+                model=settings.AZURE_OPENAI_DEPLOYMENT,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": "Extract structured student profile data from resume images."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Extract structured profile data from this resume image. Return JSON with fields: first_name, last_name, email, phone, gender, dob, city, zip_code, citizenship, address, mother_profession, father_profession, institution, degree, major, cgpa, start_year, end_year, current_year, skills, projects, experience, activities, certifications"},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}", "detail": "high"}}
+                        ]
+                    }
+                ],
+                temperature=0
+            )
+            try:
+                parsed = json.loads(response.choices[0].message.content)
+            except:
+                parsed = {}
+            return Response({"personal": sanitize_years(parsed)})
 
         else:
-            return Response({"error": "Unsupported file type"}, status=400)
+            return Response({"error": "File format not supported, pls upload file in pdf/jpg format"}, status=400)
 
         # FIX 3: Added the missing client.chat.completions.create(...) call and assignment
         response = client.chat.completions.create(
@@ -777,7 +773,7 @@ class TranscriptParserView(UserDTOView):
                 except:
                     text = ""
 
-            elif file_name.endswith((".jpg", ".jpeg", ".png")):
+            elif file_name.endswith((".jpg", ".jpeg")):
                 print(f"Optimizing image for Vision upload: {file_name}")
                 # Re-encode image to JPEG 80 if it's too large or not JPEG
                 img = PILImage.open(io.BytesIO(file_content)).convert('RGB')
@@ -785,12 +781,8 @@ class TranscriptParserView(UserDTOView):
                 img.save(buffer, format="JPEG", quality=80)
                 images_base64.append(base64.b64encode(buffer.getvalue()).decode('utf-8'))
 
-            elif file_name.endswith(".txt"):
-                text = file_content.decode('utf-8', errors='ignore')
-                print(f"TXT extraction success: {len(text)} chars")
-
             else:
-                return Response({"error": "Unsupported file type. Supported: PDF, DOCX, DOC, JPG, JPEG, PNG, TXT"}, status=400)
+                return Response({"error": "File format not supported, pls upload file in pdf/jpg format"}, status=400)
 
         except Exception as e:
             import traceback

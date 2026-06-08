@@ -1,0 +1,350 @@
+{
+  "personalDetails": {
+    "firstName": "AYUSH",
+    "lastName": "KUMAR SAINI",
+    "email": "",
+    "countryCode": "",
+    "phoneNumber": "",
+    "dob": "",
+    "gender": "",
+    "citizenShip": "",
+    "addressline": "",
+    "city": "",
+    "zipcode": "",
+    "mothersProfession": "",
+    "fathersProfession": ""
+  },
+  "educational": [
+    {
+      "academicLevel": "College/Undergraduate",
+      "gradeLevel": "",
+      "institutionName": "IIT Kharagpur",
+      "city": "Kharagpur",
+      "yearOfCompletion": "2027",
+      "overallPercentage": "8.12",
+      "maximumPossibleGPA": "10",
+      "degree": "B.Sc (Bachelor of Science)",
+      "degreeOther": "B.S.(Hons.) in CHEMISTRY",
+      "major": "Chemistry",
+      "startYear": "",
+      "endYear": "2027",
+      "board": "",
+      "boardOther": "",
+      "subjects": []
+    },
+    {
+      "academicLevel": "High School (8th–12th grade)",
+      "gradeLevel": 12,
+      "institutionName": "AMRIT MEMORIAL HIGHER SECONDARY SCHOOL",
+      "city": "",
+      "yearOfCompletion": "2023",
+      "overallPercentage": "89.40",
+      "maximumPossibleGPA": "",
+      "degree": "",
+      "degreeOther": "",
+      "major": "",
+      "startYear": "",
+      "endYear": "2023",
+      "board": "CBSE",
+      "boardOther": "",
+      "subjects": []
+    },
+    {
+      "academicLevel": "High School (8th–12th grade)",
+      "gradeLevel": 10,
+      "institutionName": "AMRIT MEMORIAL HIGHER SECONDARY SCHOOL",
+      "city": "",
+      "yearOfCompletion": "2021",
+      "overallPercentage": "93.60",
+      "maximumPossibleGPA": "",
+      "degree": "",
+      "degreeOther": "",
+      "major": "",
+      "startYear": "",
+      "endYear": "2021",
+      "board": "CBSE",
+      "boardOther": "",
+      "subjects": []
+    }
+  ],
+  "courses": [
+    {
+      "courseType": "Coursework",
+      "description": "PROGRAMMING AND DATA STRUCTURES",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "ADVANCED CALCULUS",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "LINEAR ALGEBRA, NUMERICAL AND COMPLEX ANALYSIS",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "ELECTRICAL TECHNOLOGY",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "BASIC ELECTRONICS",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "PROBABILITY AND STATISTICS",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "TRANSFORM CALCULUS",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "QUANTUM PHYSICS",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Coursework",
+      "description": "HIGH PERFORMANCE SCIENTIFIC COMPUTING",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Certification",
+      "description": "Full Stack Web Development Certification by Apna College. Covered front-end (HTML, CSS, JavaScript, React), back-end (Node.js, Express), database management (MongoDB, MySQL), REST APIs, version control (Git), and deployment practices.",
+      "year": "2025",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    }
+  ],
+  "awards": [
+    {
+      "nameOfHonorReceived": "Achieved 98.68 percentile in JEE Mains 2023",
+      "description": "Ranking among the top 1.22% of over 1.2 million candidates nationwide.",
+      "levelOfCompetitiveness": "National",
+      "numberOfParticipants": "1200000",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "Qualified JEE Advanced 2023",
+      "description": "Among the 1.8 lakhs shortlisted candidates nationwide.",
+      "levelOfCompetitiveness": "National",
+      "numberOfParticipants": "180000",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "Max Rating of 1537 on Codeforces",
+      "description": "Achieved Specialist rating on Codeforces.",
+      "levelOfCompetitiveness": "International",
+      "numberOfParticipants": "",
+      "year": ""
+    },
+    {
+      "nameOfHonorReceived": "Max Rating of 1893 on LeetCode",
+      "description": "Achieved Knight rating on LeetCode.",
+      "levelOfCompetitiveness": "International",
+      "numberOfParticipants": "",
+      "year": ""
+    },
+    {
+      "nameOfHonorReceived": "Global Rank 850 in Codeforces Round 1045 (Div. 2)",
+      "description": "Secured a global rank of 850 out of 27000+ participants.",
+      "levelOfCompetitiveness": "International",
+      "numberOfParticipants": "27000",
+      "year": ""
+    },
+    {
+      "nameOfHonorReceived": "Global Rank 309 in Leetcode Weekly Contest 455",
+      "description": "Secured a global rank of 309 out of 28000+ participants.",
+      "levelOfCompetitiveness": "International",
+      "numberOfParticipants": "28000",
+      "year": ""
+    },
+    {
+      "nameOfHonorReceived": "Won Gold Prize in Illumination Fest (IIT KGP)",
+      "description": "Won Gold Prize among all Halls of residence.",
+      "levelOfCompetitiveness": "Institutional",
+      "numberOfParticipants": "",
+      "year": ""
+    },
+    {
+      "nameOfHonorReceived": "Excellent grade in NSO – Health & Fitness",
+      "description": "Awarded with Excellent grade for continuous 3 semesters under IIT KGP’s National Sports Organization.",
+      "levelOfCompetitiveness": "Institutional",
+      "numberOfParticipants": "",
+      "year": ""
+    }
+  ],
+  "testScores": [
+    {
+      "testType": "Other",
+      "testTypeOther": "JEE Mains",
+      "testDate": "",
+      "totalScore": "",
+      "yourScore": "",
+      "yourPercentile": "98.68",
+      "mathYourScore": "",
+      "mathYourPercentile": "",
+      "criticalReadingYourScore": "",
+      "criticalReadingYourPercentile": "",
+      "analyticalWritingScore": "",
+      "analyticalWritingPercentile": "",
+      "verbalReasoningScore": "",
+      "verbalReasoningPercentile": "",
+      "quantitativeReasoningScore": "",
+      "quantitativeReasoningPercentile": "",
+      "dataInsightsScore": "",
+      "dataInsightsPercentile": "",
+      "englishYourScore": "",
+      "englishYourPercentile": "",
+      "readingYourScore": "",
+      "readingYourPercentile": "",
+      "scienceYourScore": "",
+      "scienceYourPercentile": "",
+      "integratedReasoningScore": "",
+      "integratedReasoningPercentile": "",
+      "listeningYourScore": "",
+      "listeningYourPercentile": "",
+      "speakingYourScore": "",
+      "speakingYourPercentile": "",
+      "writingYourScore": "",
+      "writingYourPercentile": ""
+    },
+    {
+      "testType": "Other",
+      "testTypeOther": "JEE Advanced",
+      "testDate": "",
+      "totalScore": "",
+      "yourScore": "",
+      "yourPercentile": "",
+      "mathYourScore": "",
+      "mathYourPercentile": "",
+      "criticalReadingYourScore": "",
+      "criticalReadingYourPercentile": "",
+      "analyticalWritingScore": "",
+      "analyticalWritingPercentile": "",
+      "verbalReasoningScore": "",
+      "verbalReasoningPercentile": "",
+      "quantitativeReasoningScore": "",
+      "quantitativeReasoningPercentile": "",
+      "dataInsightsScore": "",
+      "dataInsightsPercentile": "",
+      "englishYourScore": "",
+      "englishYourPercentile": "",
+      "readingYourScore": "",
+      "readingYourPercentile": "",
+      "scienceYourScore": "",
+      "scienceYourPercentile": "",
+      "integratedReasoningScore": "",
+      "integratedReasoningPercentile": "",
+      "listeningYourScore": "",
+      "listeningYourPercentile": "",
+      "speakingYourScore": "",
+      "speakingYourPercentile": "",
+      "writingYourScore": "",
+      "writingYourPercentile": ""
+    }
+  ],
+  "professional": {
+    "experiences": []
+  },
+  "extraCurricular": [
+    {
+      "activityType": "Competition/Fest",
+      "startDate": "",
+      "endDate": "",
+      "positionHeld": "",
+      "awardsCertifications": "Won Gold Prize among all Halls of residence",
+      "description": "Illumination Fest (IIT KGP): Designed and arranged 50+ diyas for theme-based visual displays in campus-wide competition, designed 15+ paper panels."
+    },
+    {
+      "activityType": "Sports/Fitness",
+      "startDate": "",
+      "endDate": "",
+      "positionHeld": "",
+      "awardsCertifications": "Excellent grade",
+      "description": "NSO – Health & Fitness: Awarded with Excellent grade for continuous 3 semesters under IIT KGP’s National Sports Organization."
+    }
+  ],
+  "skills": [
+    "C",
+    "C++",
+    "Java",
+    "Python",
+    "JavaScript",
+    "HTML5",
+    "CSS3",
+    "React.js",
+    "Next.js",
+    "Tailwind CSS",
+    "Material UI",
+    "Recharts",
+    "Node.js",
+    "Express.js",
+    "MongoDB",
+    "JWT",
+    "NextAuth.js",
+    "Git",
+    "GitHub",
+    "Docker",
+    "Render"
+  ],
+  "projects": [
+    {
+      "title": "ZConnect",
+      "description": "Engineered a resilient full-stack video platform using WebRTC, Node.js, and JavaScript, enabling real-time audio/video communication. Designed and applied a custom signaling server using WebSockets to manage peer-to-peer connections, enabling room creation, participant management, session control, and real-time presence for seamless multi-user communication in scalable apps. Developed a modular Node.js backend using Express.js to handle API routing and signaling logic, ensuring responsiveness and scalability. Implemented video stream management with real-time track replacement and screen sharing, enhancing collaboration and adaptability. Integrated end-to-end user authentication using JWT tokens, enabling secure access control for private video rooms and maintaining user sessions. Built a real-time chat module with synchronized message timestamps, typing indicators, and join/leave tracking, integrated with live video stream. Applied mobile-first design with responsive layouts and touch-optimized controls, ensuring seamless usability across smartphones and desktops.",
+      "startDate": "2025-04-01",
+      "endDate": "2025-04-01"
+    },
+    {
+      "title": "BalanceBox",
+      "description": "Enhanced a modern full-stack personal finance web application to enable real-time tracking and in-depth analysis of user financial activities, integrating intuitive dashboards and visualizations to improve user engagement and promote stronger financial awareness. Constructed an interactive and responsive frontend using React and JavaScript, with a strong focus on component reusability, modular architecture, and enhanced type safety through TypeScript integration to minimize runtime errors and improve maintainability. Established a high-performance backend using Node.js and Express.js to manage all data transactions, adhering to RESTful architecture principles. Integrated secure JWT-based authentication with bcrypt-hashed passwords, enabling protected login/registration flows and route access control. Implemented robust CRUD operations for income, expenses, and category entities, empowering users to manage financial records with minimal latency. Created and normalized a scalable MongoDB schema using Mongoose, enabling efficient storage and retrieval of user-specific financial data.",
+      "startDate": "2025-05-01",
+      "endDate": "2025-05-01"
+    },
+    {
+      "title": "CodeForge",
+      "description": "Enhanced a full-stack web application replicating version control features such as commits, branching, merging, and repository forking, backed by a persistent and stateful backend with user authentication, access control, detailed change history tracking, and real-time collaboration support. Designed and executed a custom version control engine to manage branches and visualize commit history, enabling efficient code collaboration. Leveraged the MERN stack (MongoDB, Express.js, React, Node.js) to build scalable, maintainable architecture enabling collaborative development. Engineered advanced branching and merging logic, with manual conflict resolution tools and merging for non-conflicting changes, enhancing collaboration. Applied JWT authentication with bcrypt password hashing, enabling users to manage private repositories securely. Utilized Redux Toolkit and React Context for efficient state management of repositories and user sessions, enhancing scalability and maintainability.",
+      "startDate": "2025-05-01",
+      "endDate": "2025-05-01"
+    },
+    {
+      "title": "Resume Builder",
+      "description": "Built a single-page web application using HTML, CSS, and JavaScript, enabling non-technical users to create professional, customizable resumes. Created an intuitive, mobile-first user interface using responsive CSS, ensuring a seamless user experience across desktops, tablets, and smartphones. Executed PDF export using jsPDF and html2canvas, enabling users to generate pixel-perfect, print-ready resumes from the web app. Executed customizable themes and layout options, allowing users to personalize resumes by selecting font styles, color palettes, section arrangements, and spacing preferences for a tailored and professional appearance across various devices and print formats. Executed form validation and autosave using localStorage, ensuring data integrity and enhancing reliability during long editing sessions. Ensured semantic HTML structure and incorporated accessible design practices to enhance usability and compatibility with assistive technologies.",
+      "startDate": "2025-06-01",
+      "endDate": "2025-06-01"
+    }
+  ]
+}
