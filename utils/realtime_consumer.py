@@ -449,11 +449,6 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
             if not self._use_openai_direct:
                 transcription_model = getattr(settings, 'AZURE_OPENAI_WHISPER_DEPLOYMENT', 'whisper')
 
-            # Map simple language codes to locale / script-aware codes where helpful
-            transcription_lang = getattr(self, 'language', 'en')
-            if transcription_lang == 'hi':
-                transcription_lang = 'hi-IN'
-
             session_config = {
                 "type": "session.update",
                 "session": {
@@ -464,8 +459,7 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
                     "output_audio_format": "pcm16",
                     "input_audio_transcription": {
                         "model": transcription_model,
-                        # Prefer locale-aware codes (e.g. 'hi-IN') to improve script/orthography
-                        "language": transcription_lang,
+                        "language": getattr(self, 'language', 'en'),
                     },
                     "input_audio_noise_reduction": self.get_noise_reduction_config(),
                     "turn_detection": self.get_turn_detection_config(),

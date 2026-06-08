@@ -84,7 +84,7 @@ FALLBACK_PRICES = {
     "domain_discovery": 999,
 }
 
-from .currency_utils import get_usd_to_inr_rate
+from .currency_utils import get_usd_to_inr_rate, convert_inr_to_usd
 
 
 def get_module_price(
@@ -96,8 +96,8 @@ def get_module_price(
     """Resolve price for a single module.
 
     Resolution order: user-specific → school-specific → global → fallback.
-    If *currency* is not INR, look up the currency_variants JSON; fall back
-    to the INR base price when the variant is missing.
+    If *currency* is not INR, look up the currency_variants JSON; if the
+    variant is missing, return None.
     """
     pricing = None
 
@@ -121,9 +121,8 @@ def get_module_price(
 
     if not pricing:
         price = FALLBACK_PRICES.get(module_name, DEFAULT_MODULE_PRICE)
-        if currency == "USD":
-            rate = get_usd_to_inr_rate()
-            return round(float(price) / rate, 2)
+        if currency and currency != "INR":
+            return None
         return round(float(price), 2)
 
     base_price = float(pricing.price)
@@ -132,11 +131,7 @@ def get_module_price(
         if currency in variants and variants[currency] is not None:
             return round(float(variants[currency]), 2)
         
-        # Automatic conversion if no variant is set
-        if currency == "USD":
-            rate = get_usd_to_inr_rate()
-            return round(base_price / rate, 2)
-        # Add other currencies if needed...
+        return None
 
     return round(base_price, 2)
 
