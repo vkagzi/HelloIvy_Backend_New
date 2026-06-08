@@ -266,6 +266,15 @@ class SchoolStudentsView(UserDTOView):
                     matching_ids.append(p.user_id)
             students = students.filter(id__in=matching_ids)
 
+        # Module filter — any active subscription
+        module_filter = request.query_params.get("module")
+        if module_filter:
+            students = students.filter(
+                id__in=UserModuleSubscription.objects.filter(
+                    module_name=module_filter, is_active=True
+                ).values_list("user_id", flat=True)
+            )
+
         # Check if grouping by grade is requested
         group_by = request.query_params.get("group_by")
         if group_by == "grade":
@@ -277,10 +286,9 @@ class SchoolStudentsView(UserDTOView):
                 for p in UserProfile.objects.filter(user_id__in=student_ids)
             }
 
-            # Fetch assigned modules for all students
+            # Fetch all active subscriptions for these students (could be school-assigned or self-purchased)
             assignments_qs = UserModuleSubscription.objects.filter(
                 user_id__in=student_ids,
-                source="school_assignment",
                 is_active=True,
             ).values("user_id", "id", "module_name")
             assignments_map: dict[int, list[dict]] = {}
@@ -300,9 +308,9 @@ class SchoolStudentsView(UserDTOView):
             # Build complete student data
             all_students_data = []
             for s in students:
+                student_assignments = assignments_map.get(s.id, [])
                 profile_json = profiles_map.get(s.id, {})
                 profile_inner = profile_json.get("profile", profile_json)
-                personal = profile_inner.get("personalDetails", {})
                 edu = profile_inner.get("educational", {})
                 all_students_data.append(
                     {
@@ -316,7 +324,7 @@ class SchoolStudentsView(UserDTOView):
                         "is_active": s.is_active,
                         "last_login": s.last_login.isoformat() if s.last_login else None,
                         "created_at": s.created_at.isoformat(),
-                        "assigned_modules": assignments_map.get(s.id, []),
+                        "assigned_modules": student_assignments,
                     }
                 )
 

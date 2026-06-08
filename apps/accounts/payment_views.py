@@ -122,6 +122,8 @@ def get_module_price(
     if not pricing:
         price = FALLBACK_PRICES.get(module_name, DEFAULT_MODULE_PRICE)
         if currency and currency != "INR":
+            if currency == "USD":
+                return 10.00
             return None
         return round(float(price), 2)
 
@@ -131,6 +133,9 @@ def get_module_price(
         if currency in variants and variants[currency] is not None:
             return round(float(variants[currency]), 2)
         
+        if currency == "USD":
+            return 10.00
+            
         return None
 
     return round(base_price, 2)
@@ -1533,7 +1538,7 @@ class SchoolStudentModuleAssignView(UserDTOView):
         if not students.exists():
             return Response({"error": "No matching students found"}, status=400)
 
-        # Find the matching active school subscriptions
+        # Find the matching active school subscriptions (optional — admin can assign without one)
         school_subs = {
             sub.module_name: sub
             for sub in SchoolModuleSubscription.objects.filter(
@@ -1544,19 +1549,11 @@ class SchoolStudentModuleAssignView(UserDTOView):
             ).order_by("-expiry_date")
         }
 
-        missing_modules = [m for m in module_names if m not in school_subs]
-        if missing_modules:
-            return Response(
-                {"error": f"School does not have active subscriptions for: {missing_modules}"},
-                status=400,
-            )
-
-        # Soft capacity check
+        # Soft capacity check (only for modules that have a subscription + capacity limit)
         warnings = []
-        from django.db.models import Sum
         for mod in module_names:
-            school_sub = school_subs[mod]
-            if school_sub.max_students is not None:
+            school_sub = school_subs.get(mod)
+            if school_sub and school_sub.max_students is not None:
                 current_assigned = get_assigned_count_for_school(mod, self.user_dto.school_id)
                 new_count = students.count()
                 if current_assigned + new_count > school_sub.max_students:
@@ -1566,32 +1563,37 @@ class SchoolStudentModuleAssignView(UserDTOView):
                         f"max = {school_sub.max_students})"
                     )
 
+        # Default expiry: 1 year from today if no subscription exists
+        from datetime import date, timedelta
+        default_expiry = str(date.today() + timedelta(days=365))
+
         admin_user = User.objects.get(id=self.user_dto.id)
         created = []
         skipped = 0
         for student in students:
             for mod in module_names:
-                school_sub = school_subs[mod]
-                # Duplicate prevention: skip if active assignment already exists
-                existing = UserModuleSubscription.objects.filter(
+                school_sub = school_subs.get(mod)  # May be None if no subscription
+                # Duplicate prevention: skip if active assignment already exists for this user+module
+                existing_qs = UserModuleSubscription.objects.filter(
                     user=student,
                     module_name=mod,
-                    school_subscription=school_sub,
                     source="school_assignment",
                     is_active=True,
-                ).exists()
-                if existing:
+                )
+                if school_sub:
+                    existing_qs = existing_qs.filter(school_subscription=school_sub)
+                if existing_qs.exists():
                     skipped += 1
                     continue
 
-                exp_date = expiry_date_str or str(school_sub.expiry_date)
+                exp_date = expiry_date_str or (str(school_sub.expiry_date) if school_sub else default_expiry)
                 assignment = UserModuleSubscription.objects.create(
                     user=student,
                     module_name=mod,
                     expiry_date=exp_date,
                     is_active=True,
                     source="school_assignment",
-                    school_subscription=school_sub,
+                    school_subscription=school_sub,  # None if no subscription linked
                     assigned_by=admin_user,
                 )
                 created.append({

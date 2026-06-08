@@ -161,6 +161,30 @@ def get_module_usage_count_for_school(module_name: str, school_id: int) -> int:
     return get_module_usage_count(module_name, student_ids)
 
 
+def get_assigned_count(module_name: str, student_ids: list[int]) -> int:
+    """Count distinct students (from *student_ids*) with active school_assignment subscriptions for a module.
+    
+    This counts students who have been ASSIGNED the module (via school assignment),
+    not just those who have used it (created a session).
+    """
+    from .models import UserModuleSubscription
+
+    if not student_ids:
+        return 0
+
+    return (
+        UserModuleSubscription.objects.filter(
+            user_id__in=student_ids,
+            module_name=module_name,
+            source="school_assignment",
+            is_active=True,
+        )
+        .values("user_id")
+        .distinct()
+        .count()
+    )
+
+
 def get_assigned_count_for_school(module_name: str, school_id: int) -> int:
     """Count distinct students with active school_assignment subscriptions for a module."""
     from .models import UserModuleSubscription

@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from utils.user_dto_view import UserDTOView
 from .models import School, SchoolModuleSubscription, ModuleName, User
-from .services import get_module_usage_count
+from .services import get_assigned_count
 
 
 class SchoolDashboardView(UserDTOView):
@@ -119,11 +119,10 @@ class SchoolDashboardView(UserDTOView):
                 "student_count": info["student_count"],
             }
 
-            # Module participation counts
+            # Module assignment counts (students assigned to modules via school assignment)
             ids = info["student_ids"]
-            entry["domain_discovery_count"] = get_module_usage_count("domain_discovery", ids)
-            entry["career_discovery_count"] = get_module_usage_count("career_discovery", ids)
-
+            entry["domain_discovery_count"] = get_assigned_count("domain_discovery", ids)
+            entry["career_discovery_count"] = get_assigned_count("career_discovery", ids)
             result.append(entry)
 
-        return result
+        return result     
