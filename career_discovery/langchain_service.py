@@ -1227,6 +1227,43 @@ Generate your personalized opening:"""
             "Do NOT ask generic questions unrelated to careers in these domains."
         )
 
+    @staticmethod
+    def _extract_disability_context(user_profile: Dict[str, Any]) -> str:
+        """Return a short description of any learning/physical disability in the profile.
+
+        Returns an empty string if no disability is present (or fields indicate
+        no disability / prefer not to say).
+        """
+        if not user_profile:
+            return ""
+        # Navigate nested profile structure
+        profile_data = user_profile.get("profile", user_profile)
+        if isinstance(profile_data, dict) and "profile" in profile_data:
+            profile_data = profile_data["profile"]
+        personal = profile_data.get("personalDetails", {}) or {}
+
+        _no_learning = {"no learning difficulties", "none", "no", "n/a", "na", ""}
+        _no_disability = {
+            "no, i do not have any physical disability",
+            "no physical disability",
+            "prefer not to say",
+            "none",
+            "no",
+            "n/a",
+            "na",
+            "",
+        }
+
+        learning = (personal.get("learningDifficulties", "") or "").strip()
+        physical = (personal.get("physicalDisabilities", "") or "").strip()
+
+        parts = []
+        if learning and learning.lower() not in _no_learning:
+            parts.append(f"Learning difficulty: {learning}")
+        if physical and physical.lower() not in _no_disability:
+            parts.append(f"Physical disability: {physical}")
+        return "; ".join(parts)
+
     def _build_llm_messages(
         self,
         prompt_data: Dict[str, Any],
@@ -1236,6 +1273,7 @@ Generate your personalized opening:"""
         user_name: str = "there",
         domain_context: Dict[str, Any] = None,
         language: str = 'en',
+        user_profile: Dict[str, Any] = None,
     ) -> list:
         """Assemble the LangChain message list for an LLM call.
 
@@ -1256,6 +1294,9 @@ Generate your personalized opening:"""
             elif msg.get('type') == MessageType.BOT:
                 llm_messages.append(AIMessage(content=msg.get('content', '')))
 
+        # ── Detect disability for Phase 0 injection ─────────────
+        disability_ctx = self._extract_disability_context(user_profile)
+
         # Build step-specific instruction
         step_instruction = ""
         if step in (1, 2) and domain_context:
@@ -1263,13 +1304,39 @@ Generate your personalized opening:"""
             chosen = domain_context.get('domain_choices', {})
             primary = chosen.get('primary_domain', '')
             secondary = chosen.get('secondary_domain', '')
-            if step == 1 and primary:
+
+            if step == 1 and disability_ctx:
+                # Phase 0: disability check-in comes first
+                step_instruction = (
+                    f"\nPHASE 0 — DISABILITY CHECK-IN: The student's profile shows: {disability_ctx}."
+                    "\nThis is the very FIRST question of the conversation (after the intro)."
+                    "\nOpen with a warm, matter-of-fact acknowledgment of their condition and ask ONE open question"
+                    " about how it affects them in learning or work situations — so you can give more personalised career guidance."
+                    "\nExample: 'I noticed from your profile that you have [condition]. I want to make sure I give you"
+                    " the most relevant guidance — could you tell me a little about how it affects you day-to-day,"
+                    " especially in learning or work situations?'"
+                    "\nDo NOT present multiple-choice options. Do NOT ask about domain motivation yet — that comes after this check-in."
+                    "\nBe warm and normalising. Never use words like 'limitation' or 'challenge' as the opener."
+                )
+            elif step == 1 and primary:
                 step_instruction = (
                     f"\nDOMAIN MOTIVATION DEEP-DIVE: The student chose '{primary}' as their primary domain."
                     "\nAsk an open-ended question about WHY they chose this domain. Dig into the personal story — "
                     "was it a specific experience, a person who inspired them, a subject they loved, something they "
                     "built or tried, or just a strong gut feeling? Do NOT present multiple-choice options. "
                     "Let them express themselves freely."
+                )
+            elif step == 2 and disability_ctx:
+                # Phase 0 Q2: follow-up on the disability (or skip to domain motivation if Q1 answer was positive)
+                step_instruction = (
+                    f"\nPHASE 0 — DISABILITY FOLLOW-UP: The student has {disability_ctx}."
+                    "\nReview their Q1 response carefully:"
+                    "\n- If they mentioned specific impacts on their work/learning style that could affect career fit"
+                    " (e.g., concentration difficulties, reading challenges, mobility constraints) — ask ONE targeted"
+                    " follow-up to understand how they currently manage it or what environments work best for them."
+                    "\n- If their Q1 answer was brief, positive, or indicates the condition doesn't significantly affect"
+                    " their career choices — SKIP the follow-up and transition directly into Phase 1 (domain motivation)."
+                    f"\nAfter Phase 0 is done (max 2 turns), naturally transition to asking about their primary domain '{primary}'."
                 )
             elif step == 2 and secondary:
                 step_instruction = (
@@ -1330,6 +1397,7 @@ Generate your response now:"""
                 user_name=user_name,
                 domain_context=domain_context,
                 language=language,
+                user_profile=user_profile,
             )
 
             # Track token usage (note: streaming tokens are tracked differently,
