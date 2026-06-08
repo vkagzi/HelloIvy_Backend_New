@@ -129,7 +129,10 @@ class CareerRecommendationSchema(BaseModel):
             "Format: short noun phrase (4-10 words). Ranked most-critical first. Exactly 5 items. "
             "Do NOT list skills the student already mentioned having. "
             "Bad example: 'Statistical inference skills'. "
-            "Good example: 'Statistics depth beyond your BSBE core curriculum' or 'Production SQL experience beyond class projects'."
+            "Good example: 'Statistics depth beyond your BSBE core curriculum' or 'Production SQL experience beyond class projects'. "
+            "For example, if they are studying BSBE, write 'Python coding depth beyond your BSBE coursework', not just 'Python coding'. "
+            "If they have done a project in React, but the career requires backend, write 'Backend API integration beyond your frontend React project', not 'backend development'. "
+            "Every gap must feel custom-written for this specific student's background so they immediately recognize it as their actual gap."
         ),
         min_length=5,
         max_length=5,
@@ -1720,10 +1723,10 @@ Each item MUST include:
     "reason": "1-2 sentence explanation citing specific factors from this student's actual profile, education, location, skills, or constraints."
   }},
   "skill_gaps": [
-    "Most critical gap — phrased using student's actual context (e.g. 'Stats depth beyond your BSBE curriculum')",
-    "Second gap — specific tool/method they're missing (e.g. 'Hands-on PyTorch beyond theoretical ML')",
-    "Third gap — tied to what career needs vs. their current level",
-    "Fourth gap — something they did NOT mention having in conversation",
+    "Most critical gap — highly personalized (e.g., 'Python coding depth beyond your BSBE coursework')",
+    "Second gap — specific tool/method missing (e.g., 'Backend API integration beyond your frontend React project')",
+    "Third gap — derived from responses or silences in the conversation",
+    "Fourth gap — tied to what career needs vs. their actual background",
     "Fifth gap — least critical but still career-relevant delta"
   ],
   "agent_scores": {{
