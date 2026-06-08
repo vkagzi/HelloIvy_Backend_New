@@ -1187,10 +1187,9 @@ Generate your personalized opening:"""
         elif degree_filter == 'career_only':
             return (
                 "\n=== DEGREE TYPE CONSTRAINT (CAREER REPORT ONLY) ===\n"
-                "The student has requested a CAREER REPORT ONLY — they do not want postgraduate degree options.\n"
-                "The 'degrees' array for EACH career recommendation MUST contain ONLY undergraduate (UG) degrees\n"
-                "— e.g. B.Tech, B.S., B.A., BBA, B.Sc., B.E., B.Com.\n"
-                "Do NOT include Masters, MBA, M.S., M.Tech, PhD, or any other postgraduate degrees.\n"
+                "The student has requested a CAREER REPORT ONLY. The report MUST NOT contain any degree suggestions.\n"
+                "The 'degrees' array for EACH career recommendation MUST be completely empty: [].\n"
+                "Do NOT include any undergraduate or postgraduate degrees. Keep the list empty.\n"
             )
         elif degree_filter == 'pg_only':
             return (
@@ -1696,6 +1695,7 @@ For each career, you must:
 2. Calculate weighted match_percentage using assessment weights
 3. Include agent_scores with individual evaluations
 4. Ground recommendations in domain results, profile data, and conversation
+5. Personalize skill_gaps: The 5 skill gaps MUST NOT be generic. They must be highly personalized and derived from the student's PROFILE (e.g., current degree, projects, activities, school background) and the student's actual responses/silences in the CONVERSATION. For example, if they are studying BSBE, write 'Python coding depth beyond your BSBE coursework', not just 'Python coding'. If they have done a project in React, but the career requires backend, write 'Backend API integration beyond your frontend React project', not 'backend development'. Every gap must feel custom-written for this specific student's background so they immediately recognize it as their actual gap.
 
 
 Each item MUST include:
