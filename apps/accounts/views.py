@@ -1334,12 +1334,19 @@ class AdminSessionReportView(UserDTOView):
 class AdminUserCommentView(UserDTOView):
     """GET / PATCH counselor and parent/student comments for a user (admin only)."""
 
-    def _require_admin(self) -> None:
+    def _require_admin(self, user_id: int | None = None) -> None:
         if self.user_dto.role not in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN, UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN):
             raise PermissionDenied(detail="Admin access required")
+        if self.user_dto.role in (UserRole.SCHOOLADMIN, UserRole.SCHOOLOPSADMIN) and user_id:
+            try:
+                target_user = User.objects.get(id=user_id)
+                if target_user.school_id != self.user_dto.school_id:
+                    raise PermissionDenied(detail="Access denied to this student")
+            except User.DoesNotExist:
+                pass
 
     def get(self, request: Request, user_id: int) -> Response:
-        self._require_admin()
+        self._require_admin(user_id=user_id)
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -1352,7 +1359,7 @@ class AdminUserCommentView(UserDTOView):
         }, status=200)
 
     def patch(self, request: Request, user_id: int) -> Response:
-        self._require_admin()
+        self._require_admin(user_id=user_id)
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -1494,8 +1501,13 @@ class StudentSendCounselorEmailView(UserDTOView):
         counselor = User.objects.filter(
             school_id=student.school_id,
             role=UserRole.SCHOOLADMIN,
-            is_active=True,
-        ).first()
+        ).order_by('-is_active').first()
+
+        if not counselor:
+            counselor = User.objects.filter(
+                school_id=student.school_id,
+                role=UserRole.SCHOOLOPSADMIN,
+            ).order_by('-is_active').first()
 
         if not counselor:
             return Response({
@@ -1540,23 +1552,28 @@ class StudentSendCounselorEmailView(UserDTOView):
         """Return counselor info for the student's school."""
         student = User.objects.get(id=self.user_dto.id)
 
+        school_name = student.school.name if student.school else None
+
         if not student.school_id:
-            return Response({"counselor": None}, status=200)
+            return Response({"counselor": None, "school_name": school_name}, status=200)
 
         counselor = User.objects.filter(
             school_id=student.school_id,
             role=UserRole.SCHOOLADMIN,
-            is_active=True,
-        ).first()
+        ).order_by('-is_active').first()
 
         if not counselor:
-            return Response({"counselor": None}, status=200)
+            counselor = User.objects.filter(
+                school_id=student.school_id,
+                role=UserRole.SCHOOLOPSADMIN,
+            ).order_by('-is_active').first()
 
         return Response({
+            "school_name": school_name,
             "counselor": {
                 "name": f"{counselor.first_name} {counselor.last_name}".strip() or counselor.email,
                 "email": counselor.email,
-            }
+            } if counselor else None
         }, status=200)
 
 
