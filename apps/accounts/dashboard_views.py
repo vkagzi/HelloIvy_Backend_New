@@ -123,6 +123,7 @@ class SchoolDashboardView(UserDTOView):
             ids = info["student_ids"]
             entry["domain_discovery_count"] = get_assigned_count("domain_discovery", ids)
             entry["career_discovery_count"] = get_assigned_count("career_discovery", ids)
+            entry["college_selector_count"] = get_assigned_count("college_selector", ids)
             result.append(entry)
 
         return result     

@@ -12,6 +12,7 @@ import logging
 import uuid
 import urllib.parse
 from decimal import Decimal
+from django.db.models import F, Q
 
 from collections import Counter
 
@@ -1665,26 +1666,23 @@ class SchoolModuleReminderView(UserDTOView):
         if not students.exists():
             return Response({"error": "No matching students found"}, status=400)
 
-        from utils.email import send_email
-
-        school_name = School.objects.filter(id=self.user_dto.school_id).values_list('name', flat=True).first() or ''
-        platform_url = _get_frontend_base_url()
+        from utils.email import send_module_reminder_email
 
         sent = []
         failed = []
         for student in students:
             try:
-                send_email(
-                    to=student.email,
-                    subject="Reminder: Complete Your Module",
-                    html=(
-                        "<p>Hello,</p>"
-                        "<p>Time's running out! Hurry! Complete your module now "
-                        "before your service expires! Please ignore if already completed.</p>"
-                        f'<p><a href="{platform_url}">{platform_url}</a></p>'
-                        f"{'<p>— ' + school_name + '</p>' if school_name else ''}"
-                    ),
+                send_module_reminder_email(
+                    email=student.email,
+                    first_name=student.first_name
                 )
+                
+                # Upate reminder tracking for all pending subscriptions of this student
+                student.subscriptions.filter(is_active=True).update(
+                    reminder_last_sent_at=timezone.now(),
+                    reminder_count=F('reminder_count') + 1
+                )
+                
                 sent.append(student.email)
             except Exception as e:
                 logger.warning("Failed to send reminder to %s: %s", student.email, e)

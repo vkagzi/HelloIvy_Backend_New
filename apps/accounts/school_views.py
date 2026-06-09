@@ -290,12 +290,14 @@ class SchoolStudentsView(UserDTOView):
             assignments_qs = UserModuleSubscription.objects.filter(
                 user_id__in=student_ids,
                 is_active=True,
-            ).values("user_id", "id", "module_name")
+            ).values("user_id", "id", "module_name", "reminder_last_sent_at", "reminder_count")
             assignments_map: dict[int, list[dict]] = {}
             for a in assignments_qs:
                 assignments_map.setdefault(a["user_id"], []).append({
                     "id": a["id"],
                     "module_name": a["module_name"],
+                    "reminder_last_sent_at": a["reminder_last_sent_at"].isoformat() if a["reminder_last_sent_at"] else None,
+                    "reminder_count": a["reminder_count"],
                 })
 
             # Fetch auto-assign rules for this school
@@ -309,6 +311,12 @@ class SchoolStudentsView(UserDTOView):
             all_students_data = []
             for s in students:
                 student_assignments = assignments_map.get(s.id, [])
+                
+                # Check usage for each assigned module
+                from .services import get_module_usage_count
+                for a in student_assignments:
+                    a["used"] = get_module_usage_count(a["module_name"], [s.id]) > 0
+
                 profile_json = profiles_map.get(s.id, {})
                 profile_inner = profile_json.get("profile", profile_json)
                 edu = profile_inner.get("educational", {})
