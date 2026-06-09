@@ -1673,5 +1673,6 @@ class AdminUserLogsView(UserDTOView):
                 "completed_sessions": activity_logs.filter(event_type="module_complete").count(),
                 "total_interactions": activity_logs.filter(event_type="llm_interaction").count(),
                 "sessions_started": activity_logs.filter(event_type="module_start").count(),
+                "total_modules_purchased": user.subscriptions.count(),
             }
         }, status=200)

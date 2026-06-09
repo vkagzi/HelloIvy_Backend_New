@@ -226,45 +226,8 @@ def send_chatbot_report_email(
     subject = f"Your {module_name} Report – HelloIvy.ai"
     print(f"[EMAIL] Sending chatbot report to {to}")
 
-    # Format transcript
+    # Transcript section removed from email body as per user request to focus on career report.
     transcript_html = ""
-    for msg in transcript:
-        # Handle paired messages (Service structure)
-        bot_q = msg.get('bot_question') or msg.get('content')
-        user_a = msg.get('student_response') or ""
-        
-        if bot_q:
-            transcript_html += f"""
-            <div style="margin-bottom: 20px; padding: 16px; background-color: #f9f9f9; border-left: 4px solid #7B0012; border-radius: 8px;">
-                <p style="margin: 0 0 4px; font-size: 11px; font-weight: bold; color: #7B0012; text-transform: uppercase;">AI Coach</p>
-                <p style="margin: 0 0 12px; font-size: 14px; color: #333; line-height: 1.5; font-style: italic;">"{bot_q}"</p>
-            """
-            if user_a:
-                transcript_html += f"""
-                <p style="margin: 0 0 4px; font-size: 11px; font-weight: bold; color: #4f46e5; text-transform: uppercase;">You</p>
-                <p style="margin: 0; font-size: 14px; color: #333; line-height: 1.5;">{user_a}</p>
-                """
-            transcript_html += "</div>"
-
-    # Format recommendations
-    recommendations_html = ""
-    if recommendations:
-        recommendations_html += """
-        <div style="margin-top: 32px; padding: 24px; background: #fffafb; border: 1px solid #ffe4e8; border-radius: 12px;">
-            <h3 style="margin: 0 0 16px; color: #7B0012; font-size: 18px;">Key Recommendations</h3>
-        """
-        for rec in recommendations:
-            title = rec.get('career_title') or rec.get('domain_title') or rec.get('university_name') or "Recommendation"
-            match = rec.get('match_percentage', 0)
-            description = rec.get('description', '')
-            
-            recommendations_html += f"""
-            <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eee;">
-                <p style="margin: 0 0 4px; font-size: 15px; font-weight: bold; color: #1a1a2e;">{title} <span style="float: right; font-size: 13px; color: #059669;">{match}% Match</span></p>
-                <p style="margin: 0; font-size: 13px; color: #555;">{description}</p>
-            </div>
-            """
-        recommendations_html += "</div>"
 
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 32px; background: #ffffff; border: 1px solid #eeeeee; border-radius: 16px;">
@@ -274,17 +237,11 @@ def send_chatbot_report_email(
       
       <h2 style="color: #1a1a2e; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Your {module_name} Report is Ready! &#127881;</h2>
       <p style="color: #555; font-size: 15px; line-height: 1.6;">Hi <strong>{student_name}</strong>,</p>
-      <p style="color: #555; font-size: 15px; line-height: 1.6;">Great job completing your discovery session! We've compiled your conversation and top recommendations below so you can refer back to them anytime.</p>
-
-      {recommendations_html}
-
-      <div style="margin-top: 32px;">
-        <h3 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px;">Conversation History</h3>
-        {transcript_html}
-      </div>
+      <p style="color: #555; font-size: 15px; line-height: 1.6;">Congratulations on completing your {module_name} session!</p>
+      <p style="color: #555; font-size: 15px; line-height: 1.6;">We have generated a <b>comprehensive professional report</b> based on your responses. You can find the detailed career analysis attached to this email as a PDF file.</p>
 
       <div style="margin-top: 32px; text-align: center; padding: 24px; background: #f9fafb; border-radius: 12px;">
-        <p style="margin: 0 0 16px; font-size: 14px; color: #555;">You can also view your full interactive report on the HelloIvy dashboard.</p>
+        <p style="margin: 0 0 16px; font-size: 14px; color: #555;">You can also access your full interactive discovery results anytime on the HelloIvy dashboard.</p>
         <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #7B0012; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Go to Dashboard</a>
       </div>
 

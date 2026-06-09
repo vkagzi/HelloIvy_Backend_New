@@ -42,7 +42,6 @@ from utils.azure_openai import create_azure_openai_client
 from django.utils import timezone
 from utils.profile_formatting import format_user_profile_context
 from utils.email import send_chatbot_report_email
-from utils.report_pdf import generate_discovery_report_pdf, ReportData
 
 
 class CollegeSelectorDegreeOptionsView(APIView):
@@ -462,39 +461,6 @@ class CollegeSelectorGenerateRecommendationsView(APIView):
 
             session.refresh_from_db(fields=['token_usage'])
 
-            # Trigger email if not already sent
-            if not session.metadata.get('report_emailed'):
-                try:
-                    transcript = college_selector_service.get_transcript(session)
-                    recommendations = college_selector_service.get_recommendations(session)
-                    
-                    # Generate PDF report
-                    pdf_data = ReportData(
-                        student_name=user.first_name or "Student",
-                        module_name='College Selector',
-                        session_id=session.session_id,
-                        generated_at=datetime.now().isoformat(),
-                        transcript=transcript.get('messages', []),
-                        recommendations=recommendations
-                    )
-                    report_pdf = generate_discovery_report_pdf(pdf_data)
-
-                    send_chatbot_report_email(
-                        email=user.email,
-                        student_name=user.first_name or "Student",
-                        module_name='College Selector',
-                        transcript=transcript.get('messages', []),
-                        recommendations=serializer.data,
-                        session_id=session.session_id,
-                        report_pdf=report_pdf
-                    )
-                    
-                    # Mark as emailed
-                    session.metadata['report_emailed'] = True
-                    session.save(update_fields=['metadata'])
-                except Exception as email_err:
-                    print(f"Error triggering college chatbot report email: {email_err}")
-
             return Response({
                 'session_id': session.session_id,
                 'recommendations': serializer.data,
@@ -817,6 +783,46 @@ class CollegeSelectorSessionDebugView(APIView):
                 {'error': f'Failed to get debug info: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class CollegeEmailReportView(APIView):
+    """Email the final College Selector report PDF"""
+    permission_classes = []
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, session_id):
+        try:
+            user = get_user_instance(request.user)
+            if not user:
+                return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            session = college_selector_service.get_session_by_id(session_id)
+            if not session or not session.user or session.user.id != user.id:
+                return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+            report_pdf = request.FILES.get('pdf')
+            if not report_pdf:
+                return Response({'error': 'PDF file is required'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            pdf_bytes = report_pdf.read()
+
+            from utils.email import send_chatbot_report_email
+            student_name = user.first_name or "Student"
+
+            send_chatbot_report_email(
+                email=user.email,
+                student_name=student_name,
+                module_name='College Selector',
+                transcript=[],
+                recommendations=[],
+                session_id=session.session_id,
+                report_pdf=pdf_bytes
+            )
+            session.metadata['report_emailed'] = True
+            session.save(update_fields=['metadata'])
+
+            return Response({'message': 'Email sent successfully'})
+        except Exception as e:
+            return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CollegeSelectorHealthCheckView(APIView):

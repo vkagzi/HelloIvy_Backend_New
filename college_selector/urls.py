@@ -18,6 +18,7 @@ from .views import (
     CollegeSelectorTestScoresView,
     CollegeSelectorSessionDebugView,
     CollegeSelectorHealthCheckView,
+    CollegeEmailReportView,
 )
 
 app_name = 'college_selector'
@@ -51,6 +52,7 @@ urlpatterns = [
     # Recommendations
     path('<str:session_id>/recommendations/generate/', CollegeSelectorGenerateRecommendationsView.as_view(), name='recommendations_generate'),
     path('<str:session_id>/recommendations/', CollegeSelectorGetRecommendationsView.as_view(), name='recommendations_get'),
+    path('<str:session_id>/email-report/', CollegeEmailReportView.as_view(), name='email_report'),
 
     # Debug
     path('<str:session_id>/debug/', CollegeSelectorSessionDebugView.as_view(), name='session_debug'),

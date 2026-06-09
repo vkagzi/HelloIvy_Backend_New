@@ -839,6 +839,7 @@ STRICT RULES:
      If you map it to "Other", fill in the original board name in the `boardOther` field.
    - Extract `overallPercentage` as the overall/aggregate percentage or score (a plain number, NO % symbol). If per-subject scores are given and no aggregate is stated, leave it empty.
    - Extract all `subjects` with their scores.
+   - TERM/SEMESTER-WISE DATA FOR HIGH SCHOOL: If the transcript has term-wise or semester-wise subject breakdowns, extract them into the `terms` array. Each entry should have `termName` (e.g. "Term 1", "Semester 1") and a `subjects` array with the same structure as the top-level subjects.
 9. SUBJECTS: For each subject, extract the name, level, marks obtained (yourTotalScore as a plain number, NO % symbol), and maximum possible marks (highestTotalScore, also a plain number e.g. 100). Ground the `level` field strictly to one of: "Not Applicable", "A Level", "AS Level", "AP", "Advanced", "Core", "Extended", "Higher", "Honors", "Standard".
 10. SCORES & PERCENTILES: Always return numeric scores and percentiles as plain integers or numbers WITHOUT any suffix, symbol, or unit. Do NOT include "%", "th", "rd", "st", "CGPA", "GPA", "/100", etc. Just the number (e.g. "97th Percentile" -> 97, "95%" -> 95, "7.8 CGPA" -> 7.8).
 11. PROFESSIONAL EXPERIENCES: 
@@ -864,6 +865,14 @@ STRICT RULES:
     - For Others: Extract yourScore.
 15. SKILLS & PROJECTS: Extract skills and major projects. Map these to "additional" section if no specific section exists.
 
+UNIVERSITY SEMESTER/YEAR-WISE SCORES (CRITICAL - DO NOT SKIP):
+- For any College/Undergraduate, Postgraduate, or Working Professional record, if the transcript contains semester-wise or year-wise GPA/SGPA/scores, you MUST extract them.
+- Set `hasSemesterWiseScores` to "Yes" if the data is semester-wise breakdown, or "No" if it is year-wise.
+- Extract each semester or year as an object in the `semesters` array.
+- Each semester object: {{ "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }}. The `semesterName` should be "1st Semester", "2nd Semester", etc. for semesters, or "1st Year", "2nd Year", etc. for years.
+- Look for "Semester GPA (SGPA)", "SGPA", "GPA", "CGPA", "Term GPA" values in each semester/year section. Extract the numeric value only (e.g. "8.75 / 10.00" -> sgpa: 8.75, maxSgpa: 10.0).
+- This is MANDATORY. If 8 semesters are in the transcript, the `semesters` array must have 8 entries.
+
 JSON STRUCTURE:
 {{
   "personalDetails": {{ "firstName": "", "lastName": "", "email": "", "countryCode": "", "phoneNumber": "", "dob": "YYYY-MM-DD", "gender": "", "citizenShip": "", "addressline": "", "city": "", "zipcode": "", "mothersProfession": "", "fathersProfession": "" }},
@@ -876,6 +885,13 @@ JSON STRUCTURE:
        "boardOther": "",
        "subjects": [
           {{ "subject": "", "level": "", "yourTotalScore": "", "highestTotalScore": "100" }}
+       ],
+       "terms": [
+          {{ "termName": "Term 1", "subjects": [{{ "subject": "", "level": "", "yourTotalScore": "", "highestTotalScore": "100" }}] }}
+       ],
+       "hasSemesterWiseScores": "Yes",
+       "semesters": [
+          {{ "semesterName": "1st Semester", "sgpa": 0.0, "maxSgpa": 10.0 }}
        ]
     }}
   ],

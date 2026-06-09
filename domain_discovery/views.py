@@ -39,7 +39,6 @@ from utils.user_helpers import get_user_instance, get_user_display_name
 from utils.azure_openai import create_azure_openai_client
 from django.utils import timezone
 from utils.email import send_chatbot_report_email
-from utils.report_pdf import generate_discovery_report_pdf, ReportData
 
 
 def get_user_from_token_param(request):
@@ -771,41 +770,6 @@ class DomainReportGenerateView(APIView):
 
             # Generate final report
             report = domain_discovery_service.generate_final_report(session)
-            
-            # Trigger email if not already sent
-            if not session.metadata.get('report_emailed'):
-                try:
-                    transcript = domain_discovery_service.get_conversation_transcript(session)
-                    recommendations = domain_discovery_service.get_recommendations(session)
-                    from .serializers import DomainRecommendationSerializer
-                    rec_data = DomainRecommendationSerializer(recommendations, many=True).data
-                    
-                    # Generate PDF report
-                    pdf_data = ReportData(
-                        student_name=report.get('student_name', 'Student'),
-                        module_name='Stream & Subject Selection',
-                        session_id=session.session_id,
-                        generated_at=report.get('generated_at', datetime.now().isoformat()),
-                        transcript=transcript.get('messages', []),
-                        recommendations=rec_data
-                    )
-                    report_pdf = generate_discovery_report_pdf(pdf_data)
-
-                    send_chatbot_report_email(
-                        email=user.email,
-                        student_name=report.get('student_name', 'Student'),
-                        module_name='Stream & Subject Selection',
-                        transcript=transcript.get('messages', []),
-                        recommendations=rec_data,
-                        session_id=session.session_id,
-                        report_pdf=report_pdf
-                    )
-                    
-                    # Mark as emailed
-                    session.metadata['report_emailed'] = True
-                    session.save(update_fields=['metadata'])
-                except Exception as email_err:
-                    print(f"Error triggering chatbot report email: {email_err}")
 
             return Response({
                 'session_id': session.session_id,
@@ -1119,3 +1083,43 @@ class SubmitModuleReviewView(APIView):
         return Response(
             {"message": "Review saved successfully"}
         )
+
+class DomainEmailReportView(APIView):
+    """Email the final Stream & Subject Selection report PDF"""
+    permission_classes = []
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, session_id):
+        try:
+            user = get_user_instance(request.user)
+            if not user:
+                return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            session = domain_discovery_service.get_session_by_id(session_id)
+            if not session or not session.user or session.user.id != user.id:
+                return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+            report_pdf = request.FILES.get('pdf')
+            if not report_pdf:
+                return Response({'error': 'PDF file is required'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            pdf_bytes = report_pdf.read()
+
+            from utils.email import send_chatbot_report_email
+            student_name = user.first_name or "Student"
+
+            send_chatbot_report_email(
+                email=user.email,
+                student_name=student_name,
+                module_name='Stream & Subject Selection',
+                transcript=[],
+                recommendations=[],
+                session_id=session.session_id,
+                report_pdf=pdf_bytes
+            )
+            session.metadata['report_emailed'] = True
+            session.save(update_fields=['metadata'])
+
+            return Response({'message': 'Email sent successfully'})
+        except Exception as e:
+            return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

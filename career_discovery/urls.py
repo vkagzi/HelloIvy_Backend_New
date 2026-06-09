@@ -13,6 +13,7 @@ from .views import (
     CareerRecommendationsGetView,
     CareerHealthCheckView,
     CareerSessionDebugView,
+    CareerEmailReportView,
 )
 
 app_name = 'career_discovery'
@@ -40,4 +41,5 @@ urlpatterns = [
     # Recommendations
     path('<str:session_id>/recommendations/generate/', CareerRecommendationsGenerateView.as_view(), name='recommendations_generate'),
     path('<str:session_id>/recommendations/', CareerRecommendationsGetView.as_view(), name='recommendations_get'),
+    path('<str:session_id>/email-report/', CareerEmailReportView.as_view(), name='email_report'),
 ]

@@ -20,6 +20,7 @@ from .views import (
     DomainHealthCheckView,
     DomainDebugInfoView,
     SubmitModuleReviewView,
+    DomainEmailReportView,
 )
 
 app_name = 'domain_discovery'
@@ -55,6 +56,7 @@ urlpatterns = [
     path('<str:session_id>/results/', DomainResultsSummaryView.as_view(), name='results_summary'),
     path('<str:session_id>/transcript/', DomainTranscriptView.as_view(), name='transcript'),
     path('<str:session_id>/transcript/download/', DomainTranscriptDownloadView.as_view(), name='transcript_download'),
+    path('<str:session_id>/email-report/', DomainEmailReportView.as_view(), name='email_report'),
     
     # Debug
     path('<str:session_id>/debug/', DomainDebugInfoView.as_view(), name='debug_info'),
