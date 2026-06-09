@@ -41,6 +41,31 @@ def send_otp_email(email: str, otp_code: str) -> None:
     </div>
     """
     send_email(to, subject, html=html)
+    
+    
+def send_module_reminder_email(email: str, first_name: str) -> None:
+    """Send a reminder to complete the allocated modules."""
+    to = email
+    subject = "Reminder: Complete your test on HelloIvy.ai"
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6; border: 1px solid #eee; border-radius: 12px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <img src="https://helloivy.ai/images/iconGIF.gif" alt="HelloIvy" style="width: 60px; height: auto;">
+        </div>
+        <p>Hello {first_name or "Student"},</p>
+        <p>Greetings from <b>HelloIvy.ai &ndash; your AI-powered career guidance &amp; education co-pilot</b> designed to help you discover streams, make informed decisions, and navigate careers with clarity.</p>
+        <p>This is a reminder to complete the test allocated to you.</p>
+        <p><strong>Follow these steps:</strong></p>
+        <ol>
+            <li>Open the &ldquo;Welcome to ReachIvy&rdquo; email sent to your registered email ID.</li>
+            <li>Click on the access link.</li>
+            <li>Follow the guidelines to start using the test.</li>
+        </ol>
+        <p>Please connect on <a href="mailto:help@helloivy.ai">help@helloivy.ai</a> for any queries you have.</p>
+        <p>Best regards,<br>Team HelloIvy.ai</p>
+    </div>
+    """
+    send_email(to, subject, html=html)
 
 
 def send_temp_password_email(email: str, temp_password: str, student_name: str = "") -> None:

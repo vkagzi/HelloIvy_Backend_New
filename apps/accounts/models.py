@@ -111,6 +111,8 @@ class UserModuleSubscription(models.Model):
         "User", on_delete=models.SET_NULL, null=True, blank=True, related_name="module_assignments_made"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    reminder_last_sent_at = models.DateTimeField(null=True, blank=True)
+    reminder_count = models.IntegerField(default=0)
 
     def __str__(self) -> str:
         return f"{self.user.email} - {self.get_module_name_display()}"

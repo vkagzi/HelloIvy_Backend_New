@@ -149,6 +149,12 @@ def get_module_usage_count(module_name: str, student_ids: list[int]) -> int:
             CareerSession.objects.filter(user_id__in=student_ids)
             .values("user_id").distinct().count()
         )
+    if module_name == "college_selector":
+        from college_selector.models import CollegeSelectorSession
+        return (
+            CollegeSelectorSession.objects.filter(user_id__in=student_ids)
+            .values("user_id").distinct().count()
+        )
     return 0
 
 
