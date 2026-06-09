@@ -317,27 +317,56 @@ def format_user_profile_context(user_profile: Dict[str, Any], user_name: str = "
             if hs_parts:
                 hs_section_parts.append(" | ".join(hs_parts))
 
-            # Subjects
-            subjects = hs.get("subjects", [])
-            subject_rows: list[str] = []
-            for subj in subjects[:10]:
-                if not isinstance(subj, dict):
-                    continue
-                subj_name = subj.get("subject", "")
-                subj_other = subj.get("otherSubjectName", "")
-                subj_score = subj.get("yourTotalScore", "")
-                subj_highest = subj.get("highestTotalScore", "")
-                if not subj_name:
-                    continue
-                display_name = subj_other if subj_name.lower() == "other" and subj_other else subj_name
-                s = display_name
-                if subj_score:
-                    s += f": {subj_score}"
-                    if subj_highest:
-                        s += f"/{subj_highest}"
-                subject_rows.append(f"  – {s}")
-            if subject_rows:
-                hs_section_parts.append("Subjects:\n" + "\n".join(subject_rows))
+            # Term-wise subjects or standard subjects
+            has_term_wise = hs.get("hasTermWiseScores") == "Yes"
+            terms = hs.get("terms", [])
+            
+            if has_term_wise and terms:
+                for term in terms:
+                    if not isinstance(term, dict):
+                        continue
+                    term_name = term.get("termName", "Term")
+                    term_subjects = term.get("subjects", [])
+                    term_subject_rows = []
+                    for subj in term_subjects[:10]:
+                        if not isinstance(subj, dict):
+                            continue
+                        subj_name = subj.get("subject", "")
+                        subj_other = subj.get("otherSubjectName", "") or subj.get("subjectOther", "")
+                        subj_score = subj.get("yourTotalScore", "")
+                        subj_highest = subj.get("highestTotalScore", "")
+                        if not subj_name:
+                            continue
+                        display_name = subj_other if subj_name.lower() == "other" and subj_other else subj_name
+                        s = display_name
+                        if subj_score:
+                            s += f": {subj_score}"
+                            if subj_highest:
+                                s += f"/{subj_highest}"
+                        term_subject_rows.append(f"  – {s}")
+                    if term_subject_rows:
+                        hs_section_parts.append(f"{term_name} Subjects:\n" + "\n".join(term_subject_rows))
+            else:
+                subjects = hs.get("subjects", [])
+                subject_rows: list[str] = []
+                for subj in subjects[:10]:
+                    if not isinstance(subj, dict):
+                        continue
+                    subj_name = subj.get("subject", "")
+                    subj_other = subj.get("otherSubjectName", "") or subj.get("subjectOther", "")
+                    subj_score = subj.get("yourTotalScore", "")
+                    subj_highest = subj.get("highestTotalScore", "")
+                    if not subj_name:
+                        continue
+                    display_name = subj_other if subj_name.lower() == "other" and subj_other else subj_name
+                    s = display_name
+                    if subj_score:
+                        s += f": {subj_score}"
+                        if subj_highest:
+                            s += f"/{subj_highest}"
+                    subject_rows.append(f"  – {s}")
+                if subject_rows:
+                    hs_section_parts.append("Subjects:\n" + "\n".join(subject_rows))
 
         if hs_section_parts:
             edu_parts.append("High School:\n" + "\n".join(hs_section_parts))
@@ -384,18 +413,20 @@ def format_user_profile_context(user_profile: Dict[str, Any], user_name: str = "
             # Year-wise scores
             years = ug.get("years", [])
             yr_rows: list[str] = []
+            has_sem = ug.get("hasSemesterWiseScores") == "Yes"
+            label_type = "Semester" if has_sem else "Year"
             for i, yr in enumerate(years, 1):
                 if not isinstance(yr, dict):
                     continue
                 yr_score = yr.get("score", "")
                 yr_highest = yr.get("highestTotalScore", "")
                 if yr_score:
-                    s = f"Year {i}: {yr_score}"
+                    s = f"{label_type} {i}: {yr_score}"
                     if yr_highest:
                         s += f"/{yr_highest}"
                     yr_rows.append(f"  – {s}")
             if yr_rows:
-                ug_section_parts.append("Year-wise Scores:\n" + "\n".join(yr_rows))
+                ug_section_parts.append(f"{label_type}-wise Scores:\n" + "\n".join(yr_rows))
 
         if ug_section_parts:
             edu_parts.append("Undergraduate:\n" + "\n".join(ug_section_parts))
@@ -442,36 +473,152 @@ def format_user_profile_context(user_profile: Dict[str, Any], user_name: str = "
             # Year-wise scores
             pg_years = pg.get("years", [])
             pg_yr_rows: list[str] = []
+            has_sem = pg.get("hasSemesterWiseScores") == "Yes"
+            label_type = "Semester" if has_sem else "Year"
             for i, yr in enumerate(pg_years, 1):
                 if not isinstance(yr, dict):
                     continue
                 yr_score = yr.get("score", "")
                 yr_highest = yr.get("highestTotalScore", "")
                 if yr_score:
-                    s = f"Year {i}: {yr_score}"
+                    s = f"{label_type} {i}: {yr_score}"
                     if yr_highest:
                         s += f"/{yr_highest}"
                     pg_yr_rows.append(f"  – {s}")
             if pg_yr_rows:
-                pg_section_parts.append("Year-wise Scores:\n" + "\n".join(pg_yr_rows))
+                pg_section_parts.append(f"{label_type}-wise Scores:\n" + "\n".join(pg_yr_rows))
 
         if pg_section_parts:
             edu_parts.append("Postgraduate:\n" + "\n".join(pg_section_parts))
+
+    # --- 2.4.5 Undergraduate Prerequisite ---
+    undergraduate_prereq = educational.get("undergraduate_prereq", [])
+    if undergraduate_prereq:
+        prereq_section_parts: list[str] = []
+        for pr in undergraduate_prereq:
+            if not isinstance(pr, dict):
+                continue
+            pr_institution = pr.get("institutionName", "")
+            pr_degree = pr.get("degree", "")
+            pr_major = pr.get("major", "")
+            pr_start = pr.get("startYear", "")
+            pr_end = pr.get("endYear", "")
+            pr_overall = pr.get("overallPercentage", "") or pr.get("overallGPA", "")
+            pr_max_gpa = pr.get("maximumPossibleGPA", "") or pr.get("maximumGPA", "")
+            pr_rank = pr.get("estimatedRank", "")
+            pr_red_flags = pr.get("redFlags", "")
+
+            pr_parts: list[str] = []
+            if pr_institution:
+                pr_parts.append(f"Institution: {pr_institution}")
+            if pr_degree:
+                pr_parts.append(f"Degree: {pr_degree}")
+            if pr_major:
+                pr_parts.append(f"Major: {pr_major}")
+            if pr_start or pr_end:
+                pr_parts.append(f"Undergraduate Prerequisite Duration: {pr_start} – {pr_end}")
+            if pr_overall:
+                perf = f"Overall Score/Percentage/GPA: {pr_overall}"
+                if pr_max_gpa:
+                    perf += f"/{pr_max_gpa}"
+                pr_parts.append(perf)
+            if pr_rank:
+                pr_parts.append(f"Overall Class Rank: {pr_rank}")
+            if pr_red_flags and pr_red_flags.strip():
+                pr_parts.append(f"Notes/Red Flags: {pr_red_flags}")
+
+            if pr_parts:
+                prereq_section_parts.append(" | ".join(pr_parts))
+
+            # Year-wise scores
+            pr_years = pr.get("years", [])
+            pr_yr_rows: list[str] = []
+            has_sem = pr.get("hasSemesterWiseScores") == "Yes"
+            label_type = "Semester" if has_sem else "Year"
+            for i, yr in enumerate(pr_years, 1):
+                if not isinstance(yr, dict):
+                    continue
+                yr_score = yr.get("score", "")
+                yr_highest = yr.get("highestTotalScore", "")
+                if yr_score:
+                    s = f"{label_type} {i}: {yr_score}"
+                    if yr_highest:
+                        s += f"/{yr_highest}"
+                    pr_yr_rows.append(f"  – {s}")
+            if pr_yr_rows:
+                prereq_section_parts.append(f"{label_type}-wise Scores:\n" + "\n".join(pr_yr_rows))
+
+        if prereq_section_parts:
+            edu_parts.append("Undergraduate Prerequisite:\n" + "\n".join(prereq_section_parts))
 
     # --- 2.5 Working / Completed College (tenPlus) ---
     ten_plus = educational.get("tenPlus", [])
     if ten_plus:
         wp_parts: list[str] = []
-        for exp in ten_plus[:5]:
+        for exp in ten_plus:
             if not isinstance(exp, dict):
                 continue
-            area = exp.get("areaOfPractice", "")
-            familiarity = exp.get("familiarity", "")
-            if area:
-                s = area
-                if familiarity:
-                    s += f" (Familiarity: {familiarity})"
-                wp_parts.append(f"• {s}")
+            
+            # Check if it has degree details
+            if "institutionName" in exp or "degree" in exp:
+                institution = exp.get("institutionName", "")
+                degree = exp.get("degree", "")
+                major = exp.get("major", "")
+                start = exp.get("startYear", "")
+                end = exp.get("endYear", "")
+                overall = exp.get("overallPercentage", "") or exp.get("overallGPA", "")
+                max_gpa = exp.get("maximumPossibleGPA", "") or exp.get("maximumGPA", "")
+                rank = exp.get("estimatedRank", "")
+                red_flags = exp.get("redFlags", "")
+
+                parts: list[str] = []
+                if institution:
+                    parts.append(f"Institution: {institution}")
+                if degree:
+                    parts.append(f"Degree: {degree}")
+                if major:
+                    parts.append(f"Major: {major}")
+                if start or end:
+                    parts.append(f"Duration: {start} – {end}")
+                if overall:
+                    perf = f"Overall Score/Percentage/GPA: {overall}"
+                    if max_gpa:
+                        perf += f"/{max_gpa}"
+                    parts.append(perf)
+                if rank:
+                    parts.append(f"Overall Class Rank: {rank}")
+                if red_flags and red_flags.strip():
+                    parts.append(f"Notes/Red Flags: {red_flags}")
+
+                if parts:
+                    wp_parts.append(" | ".join(parts))
+
+                # Year/Semester-wise scores
+                years = exp.get("years", [])
+                yr_rows: list[str] = []
+                has_sem = exp.get("hasSemesterWiseScores") == "Yes"
+                label_type = "Semester" if has_sem else "Year"
+                for i, yr in enumerate(years, 1):
+                    if not isinstance(yr, dict):
+                        continue
+                    yr_score = yr.get("score", "")
+                    yr_highest = yr.get("highestTotalScore", "")
+                    if yr_score:
+                        s = f"{label_type} {i}: {yr_score}"
+                        if yr_highest:
+                            s += f"/{yr_highest}"
+                        yr_rows.append(f"  – {s}")
+                if yr_rows:
+                    wp_parts.append(f"{label_type}-wise Scores:\n" + "\n".join(yr_rows))
+            else:
+                # Legacy fallback
+                area = exp.get("areaOfPractice", "")
+                familiarity = exp.get("familiarity", "")
+                if area:
+                    s = area
+                    if familiarity:
+                        s += f" (Familiarity: {familiarity})"
+                    wp_parts.append(f"• {s}")
         if wp_parts:
             edu_parts.append("Working/Completed College:\n" + "\n".join(wp_parts))
 
