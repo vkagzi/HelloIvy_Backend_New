@@ -596,7 +596,7 @@ class DomainDiscoveryService:
 
         await sync_to_async(session.save)(update_fields=save_fields)
         
-        yield f"data: {json.dumps({'delta': '', 'is_complete': True})}\n\n"
+        yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete})}\n\n"
 
     @transaction.atomic
     def process_message(self, session: DomainSession, user_message: str) -> Dict[str, Any]:
