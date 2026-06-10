@@ -12,6 +12,10 @@ from .payment_views import (
     PaymentStatusView,
     GuestPaymentStatusView,
     PaymentReturnVerifyView,
+    UserPaymentListCreateView,
+    UserPaymentDetailView,
+    SchoolPaymentListCreateView,
+    SchoolPaymentDetailView,
     ModulePricingPublicView,
     AdminCouponListCreateView,
     AdminCouponDetailView,
@@ -79,4 +83,9 @@ urlpatterns = [
     path("admin/coupons/<int:coupon_id>/", AdminCouponDetailView.as_view()),
     path("coupons/validate/", CouponValidatePublicView.as_view()),
     path("admin/users/<int:user_id>/logs/", AdminUserLogsView.as_view()),
+    # Admin Payment Management
+    path("admin/payments/user/", UserPaymentListCreateView.as_view()),
+    path("admin/payments/user/<int:payment_id>/", UserPaymentDetailView.as_view()),
+    path("admin/payments/school/", SchoolPaymentListCreateView.as_view()),
+    path("admin/payments/school/<int:payment_id>/", SchoolPaymentDetailView.as_view()),
 ]

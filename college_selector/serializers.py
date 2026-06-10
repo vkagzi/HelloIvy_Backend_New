@@ -12,13 +12,20 @@ class CollegeSelectorMessageSerializer(serializers.ModelSerializer):
 class CollegeSelectorSessionSerializer(serializers.ModelSerializer):
     messages = CollegeSelectorMessageSerializer(many=True, read_only=True)
     is_completed = serializers.BooleanField(read_only=True)
+    is_trial_locked = serializers.SerializerMethodField()
+    
+    def get_is_trial_locked(self, obj):
+        from apps.accounts.services import check_module_access
+        access_info = check_module_access(obj.user, "college_selector")
+        return access_info["access"] == "trial" and obj.current_step >= access_info["limit"]
+    
 
     class Meta:
         model = CollegeSelectorSession
         fields = [
             'session_id', 'current_step', 'total_steps', 'current_phase',
             'preferences', 'preferences_completed',
-            'is_active', 'is_completed', 'notes', 'token_usage', 'metadata',
+            'is_active', 'is_completed', 'is_trial_locked', 'notes', 'token_usage', 'metadata',
             'created_at', 'updated_at', 'messages',
         ]
         read_only_fields = ['session_id', 'created_at', 'updated_at']
@@ -89,6 +96,7 @@ class SendMessageResponseSerializer(serializers.Serializer):
     is_complete = serializers.BooleanField()
     progress_percentage = serializers.IntegerField()
     questions_completed = serializers.IntegerField()
+    is_trial_locked = serializers.BooleanField(required=False, default=False)
     token_usage = serializers.DictField(required=False)
 
 

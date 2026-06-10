@@ -342,14 +342,19 @@ def _generate_payment_invoice(payment) -> bytes | None:
             last_name = ""
 
         transaction_id = payment.gateway_transaction_id or str(payment.id)
-        payment_date = payment.updated_at.strftime("%d %b %Y") if hasattr(payment, "updated_at") else timezone.now().strftime("%d %b %Y")
+        
+        # Priority: metadata override -> model field -> now
+        metadata = payment.metadata or {}
+        payment_date = metadata.get("order_date") or (payment.updated_at.strftime("%d %b %Y") if hasattr(payment, "updated_at") else timezone.now().strftime("%d %b %Y"))
+        
         currency = payment.currency or "INR"
         
-        pricing = (payment.metadata or {}).get("pricing", {})
-        billing_state = (payment.metadata or {}).get("billing_state", "")
+        pricing = metadata.get("pricing", {})
+        billing_state = metadata.get("billing_state", "")
         tax_label = "CGST (9%) + SGST (9%)" if billing_state == "maharashtra" else "IGST (18%)"
-        address = (payment.metadata or {}).get("address", "")
-        gst_number = (payment.metadata or {}).get("gst_number", "")
+        address = metadata.get("address", "")
+        gst_number = metadata.get("gst_number", "")
+        billing_name = metadata.get("billing_name") or user_name
 
         line_items = []
         for entry in payment.modules_purchased:
@@ -1789,7 +1794,10 @@ class StudentInvoiceDownloadView(UserDTOView):
 
     def get(self, request: Request, payment_id: int) -> HttpResponse | Response:
         try:
-            payment = UserPayment.objects.get(id=payment_id, user_id=self.user_dto.id)
+            if self.user_dto.role in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN):
+                payment = UserPayment.objects.get(id=payment_id)
+            else:
+                payment = UserPayment.objects.get(id=payment_id, user_id=self.user_dto.id)
         except UserPayment.DoesNotExist:
             return Response({"error": "Payment not found"}, status=404)
 
@@ -1811,11 +1819,14 @@ class SchoolInvoiceDownloadView(UserDTOView):
             raise PermissionDenied(detail="Only school admins can use this endpoint")
 
     def get(self, request: Request, payment_id: int) -> HttpResponse | Response:
-        self._require_school_admin()
         try:
-            payment = SchoolPayment.objects.get(id=payment_id, school_id=self.user_dto.school_id)
-        except SchoolPayment.DoesNotExist:
-            return Response({"error": "Payment not found"}, status=404)
+            if self.user_dto.role in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN):
+                payment = SchoolPayment.objects.get(id=payment_id)
+            else:
+                self._require_school_admin()
+                payment = SchoolPayment.objects.get(id=payment_id, school_id=self.user_dto.school_id)
+        except (UserPayment.DoesNotExist, SchoolPayment.DoesNotExist, PermissionDenied):
+            return Response({"error": "Payment not found or access denied"}, status=404)
 
 
         pdf_bytes = _generate_payment_invoice(payment)

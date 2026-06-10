@@ -707,6 +707,127 @@ def sanitize_years(data):
     else:
         return data
 
+class LinkedInParserView(UserDTOView):
+    allow_public = False  # Force authentication
+
+    def post(self, request):
+        linkedin_text = request.data.get("linkedin_text", "").strip()
+
+        if not linkedin_text:
+            return Response({"error": "No profile text provided. Please paste your LinkedIn profile content."}, status=400)
+
+        if len(linkedin_text) < 50:
+            return Response({"error": "The pasted content seems too short. Please copy your full LinkedIn profile page (Ctrl+A -> Ctrl+C)."}, status=400)
+
+        print(f"[LinkedInParser] Deep Sync for pasted profile text ({len(linkedin_text)} chars)")
+
+        try:
+            # Dropdown constants for the AI to pick from
+            EXPERIENCE_TYPES = "['Entrepreneurship', 'Family Business', 'Freelance', 'Full time', 'Internship', 'Part time', 'Project', 'Other']"
+            INDUSTRIES = "['Agriculture', 'Aerospace & Defense', 'Arts & Design', 'Automotive', 'Construction & Infrastructure', 'Consulting', 'Data Science', 'Education', 'Energy & Utilities', 'Finance & Banking', 'FMCG / Consumer Goods', 'Government & Public Sector', 'Healthcare & Pharmaceuticals', 'Hospitality & Tourism', 'Insurance', 'Legal', 'Logistics & Supply Chain', 'Manufacturing', 'Media & Entertainment', 'Non-Profit & NGO', 'Real Estate', 'Research & Development', 'Retail & E-commerce', 'Sports & Fitness', 'Technology & IT', 'Telecommunications', 'Other']"
+            ACADEMIC_LEVELS = "['College/Undergraduate', 'High School (8th–12th grade)', 'Postgraduate', 'Working/Completed College']"
+            PROFICIENCIES = "['Native', 'Advanced', 'Intermediate', 'Basic']"
+
+            # 100% Correct Frontend Schema
+            json_template = """{
+  "personalDetails": {
+    "firstName": "", "lastName": "", "email": "", "phoneNumber": "", "dob": "", "gender": "", "citizenShip": "India", "city": "",
+    "languages": [
+      {"language": "", "proficiency": "Native", "type": ["Read", "Write", "Speak"], "comment": ""}
+    ]
+  },
+  "educational": [
+    {
+      "academicLevel": "High School (8th–12th grade)", 
+      "gradeLevel": "Grade 10",
+      "schoolName": "",
+      "city": "",
+      "board": "CBSE",
+      "yearOfCompletion": "",
+      "overallPercentage": "",
+      "institutionName": "", 
+      "degree": "", 
+      "major": "", 
+      "startYear": "", 
+      "endYear": ""
+    }
+  ],
+  "awards": [
+    {"nameOfHonorReceived": "", "description": "", "levelOfCompetitiveness": "National", "year": ""}
+  ],
+  "courses": [
+    {"courseType": "Academic", "description": "", "year": "", "duration": ""}
+  ],
+  "professional": {
+    "experiences": [
+      {
+        "experienceType": "Internship", 
+        "industrySector": "Technology & IT",
+        "currentEmployer": "", 
+        "jobTitle": "", 
+        "city": "",
+        "startDate": "", 
+        "endDate": "", 
+        "responsibilities": "", 
+        "achievements": ""
+      }
+    ]
+  },
+  "extraCurricular": [
+    {
+      "activityType": "Volunteer Work", 
+      "positionHeld": "", 
+      "startDate": "", 
+      "endDate": "", 
+      "description": "", 
+      "awardsCertifications": ""
+    }
+  ]
+}"""
+
+            prompt = (
+                "You are an ELITE LinkedIn profile data miner. Your goal is 100% data extraction accuracy for EVERY academic stage.\n"
+                "RAW CONTENT:\n" + linkedin_text[:18000] + "\n\n"
+                "MISSION: Extract ALL education records, awards, and courses.\n"
+                "STRICT ROUTING RULES:\n"
+                "1. ANY Course/Certification/Bootcamp (e.g., 'Graph Theory Programming Camp', 'Certificate of Completion', 'Python Specialist'): PUT THESE ONLY IN THE 'courses' ARRAY.\n"
+                "2. ANY Academic Honor/Rank/Scholarship (e.g., 'Gold Medalist', 'Top 1%'): PUT THESE ONLY IN THE 'awards' ARRAY.\n"
+                "3. EXTRA-CURRICULAR: Use ONLY for Volunteer work, Student Organizations, Sports, or Leadership roles. DO NOT put academic certificates here.\n"
+                "4. educational: MUST be an array. Include separate objects for each degree (10th, 12th, UG, PG).\n"
+                "5. Mapping Academic Levels: Use ONLY " + ACADEMIC_LEVELS + ".\n"
+                "6. Mapping Skills/Scores: Map test scores (CBSE) to the overallPercentage of the matching school entry.\n\n"
+                "TARGET JSON STRUCTURE:\n" + json_template
+            )
+
+            ai_response = client.chat.completions.create(
+                model=settings.AZURE_OPENAI_DEPLOYMENT,
+                messages=[
+                    {"role": "system", "content": "You are a specialized profile data extractor. You capture every detail and return valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0,
+                response_format={"type": "json_object"}
+            )
+
+            content = ai_response.choices[0].message.content
+            parsed = json.loads(content)
+
+            # Standard profile data sanitization
+            parsed = sanitize_years(parsed)
+            parsed = normalize_grounded_dropdowns(parsed)
+
+            return Response(parsed)
+
+        except Exception as e:
+            import traceback
+            print(f"[LinkedInParser] AI Parsing error:\n{traceback.format_exc()}")
+            return Response({"error": f"Deep Scan failed: {str(e)}"}, status=500)
+
+
+
+
+
+
 class TranscriptParserView(UserDTOView):
     parser_classes = [MultiPartParser]
     allow_public = False # Force authentication
@@ -867,8 +988,9 @@ STRICT RULES:
 
 UNIVERSITY SEMESTER/YEAR-WISE SCORES (CRITICAL - DO NOT SKIP):
 - For any College/Undergraduate, Postgraduate, or Working Professional record, if the transcript contains semester-wise or year-wise GPA/SGPA/scores, you MUST extract them.
-- Set `hasSemesterWiseScores` to "Yes" if the data is semester-wise breakdown, or "No" if it is year-wise.
-- Extract each semester or year as an object in the `semesters` array.
+- IMPORTANT: Set `hasSemesterWiseScores` to "Yes" if the data is a semester-wise breakdown (e.g., Semester 1, 2...), or "No" if it is a year-wise breakdown (e.g., Year 1, 2...).
+- IMPORTANT: The `overallPercentage` field should ONLY contain the FINAL CUMULATIVE GPA/Percentage for the entire degree. Do NOT put the score of a single semester or year in this field if multiple semesters/years are present.
+- Extract each semester or year as an object in the `semesters` array with fields `semesterName`, `sgpa`, and `maxSgpa`.
 - Each semester object: {{ "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }}. The `semesterName` should be "1st Semester", "2nd Semester", etc. for semesters, or "1st Year", "2nd Year", etc. for years.
 - Look for "Semester GPA (SGPA)", "SGPA", "GPA", "CGPA", "Term GPA" values in each semester/year section. Extract the numeric value only (e.g. "8.75 / 10.00" -> sgpa: 8.75, maxSgpa: 10.0).
 - This is MANDATORY. If 8 semesters are in the transcript, the `semesters` array must have 8 entries.

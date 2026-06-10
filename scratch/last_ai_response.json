@@ -1,120 +1,431 @@
 {
   "personalDetails": {
-    "firstName": "Priya",
-    "lastName": "Sharma",
-    "email": "",
-    "countryCode": "",
-    "phoneNumber": "",
-    "dob": "2001-03-14",
+    "firstName": "Neil",
+    "lastName": "Dhaddha",
+    "email": "neildhaddha@gmail.com",
+    "countryCode": "+91",
+    "phoneNumber": "9922935366",
+    "dob": "",
     "gender": "",
     "citizenShip": "",
     "addressline": "",
-    "city": "Mumbai",
-    "zipcode": "400076",
+    "city": "Pune",
+    "zipcode": "",
     "mothersProfession": "",
     "fathersProfession": ""
   },
   "educational": [
     {
-      "academicLevel": "College/Undergraduate",
-      "gradeLevel": "",
-      "institutionName": "Mumbai Institute of Technology",
-      "city": "Mumbai",
-      "yearOfCompletion": "2023",
-      "overallPercentage": 90.8,
-      "maximumPossibleGPA": 10.0,
-      "degree": "B.E. (Bachelor of Engineering)",
-      "degreeOther": "",
-      "major": "Computer Engineering",
-      "startYear": "2019",
-      "endYear": "2023",
-      "board": "",
+      "academicLevel": "High School (8th–12th grade)",
+      "gradeLevel": 12,
+      "institutionName": "The Bishop's School",
+      "city": "Pune",
+      "yearOfCompletion": "2026",
+      "overallPercentage": "",
+      "maximumPossibleGPA": "",
+      "degree": "Other",
+      "degreeOther": "Indian School Certificate (ISC) Board",
+      "major": "",
+      "startYear": "2024",
+      "endYear": "2026",
+      "board": "ISC",
       "boardOther": "",
       "subjects": [
-        { "subject": "Engineering Mathematics I", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Programming Fundamentals", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Digital Logic Design", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Basic Electronics", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Engineering Physics", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Programming Lab", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Engineering Mathematics II", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Data Structures", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Computer Organization", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Discrete Mathematics", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Object Oriented Programming", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Data Structures Lab", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Engineering Mathematics III", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Algorithms", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Database Management Systems", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Operating Systems", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Computer Networks I", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "DBMS Lab", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Theory of Computation", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Software Engineering", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Computer Networks II", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Microprocessors", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Web Technologies", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Networks Lab", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Machine Learning", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Compiler Design", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Cloud Computing", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Information Security", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Artificial Intelligence", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "ML Lab", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Deep Learning", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Distributed Systems", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Big Data Analytics", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Mobile Application Development", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Open Source Elective", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Project Phase I", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Natural Language Processing", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Computer Vision", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "DevOps & Containerization", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Professional Elective I", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Seminar", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Project Phase II", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Entrepreneurship & Innovation", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Professional Elective II", "level": "Not Applicable", "yourTotalScore": 9, "highestTotalScore": 10 },
-        { "subject": "Professional Elective III", "level": "Not Applicable", "yourTotalScore": 8, "highestTotalScore": 10 },
-        { "subject": "Industrial Training", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 },
-        { "subject": "Final Year Project", "level": "Not Applicable", "yourTotalScore": 10, "highestTotalScore": 10 }
+        {
+          "subject": "English",
+          "level": "Not Applicable",
+          "yourTotalScore": 95,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Mathematics",
+          "level": "Not Applicable",
+          "yourTotalScore": 98,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Physics",
+          "level": "Not Applicable",
+          "yourTotalScore": 98,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Chemistry",
+          "level": "Not Applicable",
+          "yourTotalScore": 98,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Computer Science",
+          "level": "Not Applicable",
+          "yourTotalScore": 99,
+          "highestTotalScore": ""
+        }
       ],
       "terms": [],
       "hasSemesterWiseScores": "Yes",
-      "semesters": [
-        { "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 },
-        { "semesterName": "2nd Semester", "sgpa": 9.21, "maxSgpa": 10.0 },
-        { "semesterName": "3rd Semester", "sgpa": 8.79, "maxSgpa": 10.0 },
-        { "semesterName": "4th Semester", "sgpa": 8.72, "maxSgpa": 10.0 },
-        { "semesterName": "5th Semester", "sgpa": 9.37, "maxSgpa": 10.0 },
-        { "semesterName": "6th Semester", "sgpa": 9.18, "maxSgpa": 10.0 },
-        { "semesterName": "7th Semester", "sgpa": 9.33, "maxSgpa": 10.0 },
-        { "semesterName": "8th Semester", "sgpa": 9.3, "maxSgpa": 10.0 }
-      ]
-    }
-  ],
-  "courses": [],
-  "awards": [
-    {
-      "nameOfHonorReceived": "Top 5% (Class Rank: 3 / 68)",
-      "description": "Estimated Overall Rank",
-      "levelOfCompetitiveness": "",
-      "numberOfParticipants": "68",
-      "year": "2023"
+      "semesters": []
     },
     {
-      "nameOfHonorReceived": "First Class with Distinction",
-      "description": "Division",
+      "academicLevel": "High School (8th–12th grade)",
+      "gradeLevel": 10,
+      "institutionName": "St. Mary's School",
+      "city": "Pune",
+      "yearOfCompletion": "2024",
+      "overallPercentage": "",
+      "maximumPossibleGPA": "",
+      "degree": "Other",
+      "degreeOther": "Indian Certificate of Secondary Education (ICSE) Board",
+      "major": "",
+      "startYear": "2013",
+      "endYear": "2024",
+      "board": "ICSE",
+      "boardOther": "",
+      "subjects": [
+        {
+          "subject": "English",
+          "level": "Not Applicable",
+          "yourTotalScore": 98,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Hindi",
+          "level": "Not Applicable",
+          "yourTotalScore": 99,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Mathematics",
+          "level": "Not Applicable",
+          "yourTotalScore": 94,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Physics",
+          "level": "Not Applicable",
+          "yourTotalScore": 99,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Chemistry",
+          "level": "Not Applicable",
+          "yourTotalScore": 98,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Biology",
+          "level": "Not Applicable",
+          "yourTotalScore": 100,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "History",
+          "level": "Not Applicable",
+          "yourTotalScore": 99,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Geography",
+          "level": "Not Applicable",
+          "yourTotalScore": 96,
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Computer Applications",
+          "level": "Not Applicable",
+          "yourTotalScore": 100,
+          "highestTotalScore": ""
+        }
+      ],
+      "terms": [],
+      "hasSemesterWiseScores": "Yes",
+      "semesters": []
+    }
+  ],
+  "courses": [
+    {
+      "courseType": "University of Michigan, Online Course",
+      "description": "Industrial Internet of Things (IIoT): Investigated IIoT applications in manufacturing, focusing on IT infrastructure, business value, and strategies for successful adoption, in a course developed in partnership with Siemens.",
+      "year": "2025",
+      "awards": "",
+      "duration": "",
+      "location": "Online"
+    },
+    {
+      "courseType": "AP Physics C: Mechanics",
+      "description": "Completed a calculus-based study of classical mechanics, including kinematics, Newton’s laws, energy, momentum, rotation, and oscillations, emphasizing analytical reasoning and real-world applications.",
+      "year": "2025",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    },
+    {
+      "courseType": "Harvard University, Online Course",
+      "description": "CS50 Introduction to Programming with Python: Gained foundational knowledge in algorithms, loops, conditionals, functions, and data structures, developing computational thinking and programming skills through coding projects.",
+      "year": "2024",
+      "awards": "",
+      "duration": "",
+      "location": "Online"
+    },
+    {
+      "courseType": "Columbia University Pre-College Program, Online",
+      "description": "Entrepreneurship and Innovation: Examined how innovative ideas develop into sustainable ventures through coursework in market analysis, business modelling, and pitching, culminating in a collaborative start-up project.",
+      "year": "2023",
+      "awards": "",
+      "duration": "",
+      "location": "Online"
+    },
+    {
+      "courseType": "Georgia Institute of Technology, Online Course",
+      "description": "Introduction to Engineering Mechanics: An introduction to modelling and analysis of static equilibrium problems, with emphasis on applying calculus, physics, and vector principles to solve real-world engineering challenges.",
+      "year": "2023",
+      "awards": "",
+      "duration": "",
+      "location": "Online"
+    },
+    {
+      "courseType": "IBM, Online Course",
+      "description": "Introduction to Artificial Intelligence: Studied core concepts of artificial intelligence (machine learning, deep learning, and neural networks) and built a generative AI solution for an organizational challenge integrating ethical principles.",
+      "year": "2023",
+      "awards": "",
+      "duration": "",
+      "location": "Online"
+    },
+    {
+      "courseType": "PADI",
+      "description": "Certified PADI scuba diver.",
+      "year": "",
+      "awards": "",
+      "duration": "",
+      "location": ""
+    }
+  ],
+  "awards": [
+    {
+      "nameOfHonorReceived": "Indian Bank Award",
+      "description": "Received in 11th Class.",
       "levelOfCompetitiveness": "",
       "numberOfParticipants": "",
       "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "Principal's Prize",
+      "description": "Received in 11th Class.",
+      "levelOfCompetitiveness": "",
+      "numberOfParticipants": "",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "Dr. Kalyani Prize for 1st Rank",
+      "description": "Received in 11th Class.",
+      "levelOfCompetitiveness": "",
+      "numberOfParticipants": "",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "The Tata Autocom System Prize for Science",
+      "description": "Received in 11th Class.",
+      "levelOfCompetitiveness": "",
+      "numberOfParticipants": "",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "The late JT Bajaj Prize for English",
+      "description": "Received in 11th Class.",
+      "levelOfCompetitiveness": "",
+      "numberOfParticipants": "",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "Certificate of Merit for Computer Science",
+      "description": "Received in 11th Class.",
+      "levelOfCompetitiveness": "",
+      "numberOfParticipants": "",
+      "year": "2023"
+    },
+    {
+      "nameOfHonorReceived": "2nd place for product and business pitch in 2025",
+      "description": "Won in a Shark Tank-style competition for a team developing two app prototypes—a gamified stock simulator and an AI-based skincare solution.",
+      "levelOfCompetitiveness": "",
+      "numberOfParticipants": "",
+      "year": "2025"
     }
   ],
-  "testScores": [],
+  "testScores": [
+    {
+      "testType": "SAT",
+      "testTypeOther": "",
+      "testDate": "2025-01-01",
+      "totalScore": 1520,
+      "yourScore": "",
+      "yourPercentile": "",
+      "mathYourScore": 780,
+      "mathYourPercentile": "",
+      "criticalReadingYourScore": 740,
+      "criticalReadingYourPercentile": "",
+      "analyticalWritingScore": "",
+      "analyticalWritingPercentile": "",
+      "verbalReasoningScore": "",
+      "verbalReasoningPercentile": "",
+      "quantitativeReasoningScore": "",
+      "quantitativeReasoningPercentile": "",
+      "dataInsightsScore": "",
+      "dataInsightsPercentile": "",
+      "englishYourScore": "",
+      "englishYourPercentile": "",
+      "readingYourScore": "",
+      "readingYourPercentile": "",
+      "scienceYourScore": "",
+      "scienceYourPercentile": "",
+      "integratedReasoningScore": "",
+      "integratedReasoningPercentile": "",
+      "listeningYourScore": "",
+      "listeningYourPercentile": "",
+      "speakingYourScore": "",
+      "speakingYourPercentile": "",
+      "writingYourScore": "",
+      "writingYourPercentile": ""
+    }
+  ],
   "professional": {
-    "experiences": []
+    "experiences": [
+      {
+        "experienceType": "Internship",
+        "currentEmployer": "Parakh Flexipacks",
+        "startDate": "2023-10-01",
+        "endDate": "2026-05-09",
+        "jobTitle": "Manufacturing Intern",
+        "city": "Pune",
+        "industrySector": "",
+        "responsibilities": "Conducted a study on the blown film extrusion process and assisted in sorting and categorizing post-industrial polymer waste, compiling data for environmental reporting. Accompanied senior executives to Germany and Italy to evaluate advanced extrusion lines and study biodegradable technologies that are suitable for hygiene and food-grade packaging. Tracked packed polymer waste across production lines to identify inefficiencies and recommend waste-mitigation strategies.",
+        "achievements": ""
+      },
+      {
+        "experienceType": "Internship",
+        "currentEmployer": "Force Motors",
+        "startDate": "2025-05-01",
+        "endDate": "2025-06-01",
+        "jobTitle": "R&D Intern",
+        "city": "Pune",
+        "industrySector": "",
+        "responsibilities": "Trained in chassis, engine, brake, and suspension design within the Research & Development department, contributing to prototype development and design documentation. Assisted in crash and CAE simulation analysis to evaluate design performance and safety parameters. Observed Mercedes-Benz engine assembly and testing processes, gaining insight into combustion efficiency, durability testing, and performance optimization. Supported design modifications and learned about the company’s transition strategy toward electric vehicle (EV) manufacturing.",
+        "achievements": ""
+      },
+      {
+        "experienceType": "Internship",
+        "currentEmployer": "Steripro Canada",
+        "startDate": "2024-05-01",
+        "endDate": "2024-06-01",
+        "jobTitle": "Processing Intern",
+        "city": "Mississauga",
+        "industrySector": "",
+        "responsibilities": "Gained hands-on experience in hospital sterile processing operations, including decontamination, tray assembly, and steam sterilization of surgical instruments. Managed handling and tracking of operating room trays, ensuring compliance with safety and hygiene protocols. Operated Building Automation Systems (BAS) to manage HVAC parameters and microbial control standards.",
+        "achievements": ""
+      },
+      {
+        "experienceType": "Internship",
+        "currentEmployer": "Rajratan Global Wires",
+        "startDate": "2024-04-01",
+        "endDate": "2024-04-01",
+        "jobTitle": "Engineering Intern",
+        "city": "Ratchaburi",
+        "industrySector": "",
+        "responsibilities": "Shadowed the CTO to understand the bead wire manufacturing process and joined daily rounds to identify production challenges, improve process flow, and reduce material waste. Worked with Production Planning and Maintenance teams to study product cycles, energy-efficient methods, and PLC-based process control. Assisted in preparing quality assurance and production planning reports.",
+        "achievements": ""
+      },
+      {
+        "experienceType": "Internship",
+        "currentEmployer": "SAP Oleochemicals",
+        "startDate": "2023-12-01",
+        "endDate": "2023-12-01",
+        "jobTitle": "Production Intern",
+        "city": "Pune",
+        "industrySector": "",
+        "responsibilities": "Monitored process parameters (temperature, pressure, flow) to ensure product quality consistency. Compiled operational data and presented a detailed report to the plant management team.",
+        "achievements": ""
+      },
+      {
+        "experienceType": "Internship",
+        "currentEmployer": "Sudarshan Jeans India Ltd.",
+        "startDate": "2023-08-01",
+        "endDate": "2023-09-01",
+        "jobTitle": "Production Intern",
+        "city": "Indiapur",
+        "industrySector": "",
+        "responsibilities": "Shadowed production heads in the Ring Spinning and Open-End Spinning departments, gaining insight into traditional and rotor-based yarn manufacturing processes. Prepared production and efficiency reports analysing machine parameters, output quality, and performance.",
+        "achievements": ""
+      }
+    ]
   },
-  "extraCurricular": [],
-  "skills": [],
-  "projects": []
+  "extraCurricular": [
+    {
+      "activityType": "Leadership",
+      "startDate": "2023-01-01",
+      "endDate": "2023-12-31",
+      "positionHeld": "House Prefect, School Council",
+      "awardsCertifications": "",
+      "description": "Led a team of 130+ students across academics, sports, and cultural events, promoting inclusivity and collaboration. Mentored juniors, organized inter-house competitions, and delegated responsibilities to vice-prefects."
+    },
+    {
+      "activityType": "Leadership",
+      "startDate": "2023-01-01",
+      "endDate": "2025-12-31",
+      "positionHeld": "Team Leader and Mentor, Quiz Club",
+      "awardsCertifications": "Led the new team to an award at the Fr. George Hess Memorial Quiz.",
+      "description": "Represented the school at state and national-level quizzes, earning multiple awards. Trained and guided junior members through mock sessions and strategy workshops. Revived the club after transferring schools, leading the new team to an award at the Fr. George Hess Memorial Quiz."
+    },
+    {
+      "activityType": "Model United Nations",
+      "startDate": "2024-01-01",
+      "endDate": "2024-12-31",
+      "positionHeld": "Secretariat and Co-President, Model United Nations Club",
+      "awardsCertifications": "",
+      "description": "Oversaw 150+ delegates as part of the Secretariat, mentoring new participants in research and debate. Led delegations to the Harvard Model United Nations Conferences in Bangalore and Dubai."
+    },
+    {
+      "activityType": "Sports",
+      "startDate": "2023-01-01",
+      "endDate": "2023-12-31",
+      "positionHeld": "Team Captain, Basketball Team",
+      "awardsCertifications": "Attended a FIBA-certified camp (YUBAC, Serbia).",
+      "description": "Captained the school team of 16 players at inter-school and state-level tournaments, starting as point guard. Trained with a professional coach in Toronto, attended a FIBA-certified camp (YUBAC, Serbia), and joined a skills camp led by U.S. coaches in Pune, India."
+    },
+    {
+      "activityType": "Community Service",
+      "startDate": "2022-01-01",
+      "endDate": "2025-12-31",
+      "positionHeld": "Volunteer Teacher",
+      "awardsCertifications": "",
+      "description": "Taught English and Mathematics to underprivileged children to strengthen literacy and numeracy skills. Assisted in teaching basketball to underprivileged girls to promote confidence and teamwork."
+    },
+    {
+      "activityType": "Community Service",
+      "startDate": "2022-01-01",
+      "endDate": "2022-12-31",
+      "positionHeld": "Volunteer, Parakh Care",
+      "awardsCertifications": "",
+      "description": "Assisted in patient care and helped organize a blood donation camp at a local school. Proposed and presented an initiative to establish blood diagnostic camps for factory workers."
+    }
+  ],
+  "skills": [
+    "Proficient in Java",
+    "Python",
+    "HTML",
+    "CSS",
+    "JavaScript"
+  ],
+  "projects": [
+    {
+      "title": "Research Paper: A Study on Optimizing a Flexible Packaging Plant Using Building Automation Systems (BAS)",
+      "description": "Published in the American Journal of Student Research; analyzed methods to improve industrial efficiency and sustainability through BAS-driven energy optimization and downtime reduction.",
+      "startDate": "2025-01-01",
+      "endDate": "2025-12-31"
+    },
+    {
+      "title": "Shark Tank-style competition app prototypes",
+      "description": "Developed two app prototypes—a gamified stock simulator and an AI-based skincare solution—winning 2nd place for product and business pitch.",
+      "startDate": "",
+      "endDate": "2025-12-31"
+    }
+  ]
 }

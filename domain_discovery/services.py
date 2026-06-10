@@ -465,9 +465,17 @@ class DomainDiscoveryService:
         Async generator that yields SSE-formatted JSON chunks.
         """
         # Cache values that trigger DB queries
-        current_step = session.current_step
-        new_step = current_step + 1
+        # Access Check: Admins and paid users get full access, others capped at 5
+        from apps.accounts.services import check_module_access
+        access_info = await sync_to_async(check_module_access)(session.user, "domain_discovery")
         
+        if access_info["access"] == "trial" and access_info["current_usage"] >= access_info["limit"]:
+            # Trial limit reached
+            lock_message = "Purchase to continue this module"
+            yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
+            return
+
+        new_step = current_step + 1        
         # Save user message (since this is async, we use sync_to_async or just run in sync context for simple DB ops if needed)
         # But for streaming, we want to start yielding as soon as possible.
         from asgiref.sync import sync_to_async

@@ -249,3 +249,50 @@ def auto_assign_modules_for_student(user: "User") -> list[dict]:
             "module_name": rule.module_name,
         })
     return created
+
+
+def check_module_access(user, module_name: str) -> dict:
+    """
+    Unified access check for HelloIvy modules.
+    Returns a dict with access status and trial info.
+    """
+    from .models import UserRole, UserModuleSubscription
+    from django.utils import timezone
+
+    if not user:
+        return {"access": "denied", "reason": "no_user"}
+
+    # 1. Admins have full access
+    if user.role in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN, UserRole.SCHOOLADMIN):
+        return {"access": "full", "reason": "admin"}
+
+    # 2. Check for active subscription (purchased or assigned)
+    has_sub = UserModuleSubscription.objects.filter(
+        user=user,
+        module_name=module_name,
+        is_active=True,
+        expiry_date__gte=timezone.now()
+    ).exists()
+
+    if has_sub:
+        return {"access": "full", "reason": "subscription"}
+
+    # 3. Otherwise, it's Trial Access
+    # Calculate cumulative usage across all sessions for this specific module
+    usage_count = 0
+    if module_name == "domain_discovery":
+        from domain_discovery.models import DomainMessage
+        usage_count = DomainMessage.objects.filter(session__user=user, type='user').count()
+    elif module_name == "career_discovery":
+        from career_discovery.models import CareerMessage
+        usage_count = CareerMessage.objects.filter(session__user=user, type='user').count()
+    elif module_name == "college_selector":
+        from college_selector.models import CollegeSelectorMessage
+        usage_count = CollegeSelectorMessage.objects.filter(session__user=user, type='user').count()
+
+    return {
+        "access": "trial", 
+        "reason": "no_subscription", 
+        "limit": 5, 
+        "current_usage": usage_count
+    }

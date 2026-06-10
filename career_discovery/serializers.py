@@ -16,12 +16,19 @@ class CareerSessionSerializer(serializers.ModelSerializer):
     messages = CareerMessageSerializer(many=True, read_only=True)
     domain_session_id = serializers.CharField(source='domain_session.session_id', read_only=True, allow_null=True)
     is_completed = serializers.BooleanField(read_only=True)
+    is_trial_locked = serializers.SerializerMethodField()
+    
+    def get_is_trial_locked(self, obj):
+        from apps.accounts.services import check_module_access
+        access_info = check_module_access(obj.user, "career_discovery")
+        return access_info["access"] == "trial" and obj.current_step >= access_info["limit"]
+    
     
     class Meta:
         model = CareerSession
         fields = [
             'session_id', 'domain_session_id', 'current_step', 'total_steps', 'current_phase',
-            'is_active', 'is_completed', 'notes', 'token_usage', 'metadata', 'created_at', 'updated_at', 'messages'
+            'is_active', 'is_completed', 'is_trial_locked', 'notes', 'token_usage', 'metadata', 'created_at', 'updated_at', 'messages'
         ]
         read_only_fields = ['session_id', 'domain_session_id', 'created_at', 'updated_at']
 
@@ -71,6 +78,7 @@ class SendMessageResponseSerializer(serializers.Serializer):
     total_steps = serializers.IntegerField()
     is_complete = serializers.BooleanField()
     phase = serializers.CharField()
+    is_trial_locked = serializers.BooleanField(required=False, default=False)
     token_usage = serializers.DictField(required=False)
 
 
