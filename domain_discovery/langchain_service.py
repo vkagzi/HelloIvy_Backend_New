@@ -7,7 +7,7 @@ import uuid
 import logging
 import re
 import traceback
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Literal
 from datetime import datetime
 
 from langchain_openai import ChatOpenAI
@@ -63,6 +63,17 @@ class RelatedSubjectSchema(BaseModel):
     combination_pathways: List[SubjectCombinationPathwaySchema] = Field(description="1-2 subject combination pathways this subject participates in, tailored to student's board/curriculum", default_factory=list, max_length=2)
 
 
+class FeasibilitySchema(BaseModel):
+    """Schema for the feasibility metric of a domain recommendation"""
+    level: Literal["High", "Medium", "Low"] = Field(
+        description="Overall feasibility level: High (student can realistically pursue this with current profile), Medium (achievable with moderate effort/changes), Low (significant barriers exist)"
+    )
+    reason: str = Field(
+        description="1-2 sentence explanation grounded in the student's actual profile - cite specific factors like current stream, subjects, grades, or constraints/disabilities if present.",
+        max_length=400,
+    )
+
+
 class DomainRecommendationSchema(BaseModel):
     """Schema for a single domain recommendation"""
     domain_title: str = Field(description=f"Domain name - must be one of: {', '.join(DOMAIN_LIST)}")
@@ -82,6 +93,14 @@ class DomainRecommendationSchema(BaseModel):
     why_recommended: str = Field(description="Why this domain fits, tied to student's responses")
     exploration_activities: List[str] = Field(description="Activities to explore this domain (3-5 items)")
     potential_careers: List[str] = Field(description="3-5 career paths in this domain")
+    feasibility: FeasibilitySchema = Field(
+        description="Feasibility rating (High/Medium/Low) for this domain given the student's actual profile, skills, education, and constraints - with a brief evidence-based reason."
+    )
+    skill_gaps: List[str] = Field(
+        description="Top 5 personalised skill gaps (areas of growth) for this domain given the student's profile",
+        min_items=5,
+        max_items=5,
+    )
 
 
 class DomainRecommendationsOutput(BaseModel):
@@ -403,6 +422,77 @@ Generate the coaching notes:"""
             formatted.append(f"{role}: {content}")
         
         return "\n".join(formatted)
+
+    @staticmethod
+    def _extract_disability_context(user_profile: Dict[str, Any]) -> str:
+        """Return a short description of any learning/physical disability in the profile.
+
+        Returns an empty string if no disability is present (or fields indicate
+        no disability / prefer not to say).
+        """
+        if not user_profile:
+            return ""
+        # Navigate nested profile structure
+        profile_data = user_profile.get("profile", user_profile)
+        if isinstance(profile_data, dict) and "profile" in profile_data:
+            profile_data = profile_data["profile"]
+        personal = profile_data.get("personalDetails", {}) or {}
+
+        _no_learning = {"no learning difficulties", "none", "no", "n/a", "na", ""}
+        _no_disability = {
+            "no, i do not have any physical disability",
+            "no physical disability",
+            "prefer not to say",
+            "none",
+            "no",
+            "n/a",
+            "na",
+            "",
+        }
+
+        learning = (personal.get("learningDifficulties", "") or "").strip()
+        learning_comments = (personal.get("learningDifficultiesComments", "") or "").strip()
+        physical = (personal.get("physicalDisabilities", "") or "").strip()
+        physical_comments = (personal.get("physicalDisabilitiesComments", "") or "").strip()
+
+        parts = []
+        # Check learning difficulty
+        has_learning = False
+        learning_desc = ""
+        if learning and learning.lower() not in _no_learning:
+            if "other" in learning.lower() and learning_comments:
+                learning_desc = learning_comments
+            else:
+                learning_desc = learning
+                if learning_comments:
+                    learning_desc += f" ({learning_comments})"
+            has_learning = True
+        elif learning_comments and learning_comments.lower() not in _no_learning:
+            learning_desc = learning_comments
+            has_learning = True
+
+        if has_learning and learning_desc:
+            parts.append(f"Learning difficulty: {learning_desc}")
+
+        # Check physical disability
+        has_physical = False
+        physical_desc = ""
+        if physical and physical.lower() not in _no_disability:
+            if "other" in physical.lower() and physical_comments:
+                physical_desc = physical_comments
+            else:
+                physical_desc = physical
+                if physical_comments:
+                    physical_desc += f" ({physical_comments})"
+            has_physical = True
+        elif physical_comments and physical_comments.lower() not in _no_disability:
+            physical_desc = physical_comments
+            has_physical = True
+
+        if has_physical and physical_desc:
+            parts.append(f"Physical disability: {physical_desc}")
+
+        return "; ".join(parts)
 
     def build_shared_instructions(
         self,
@@ -1038,6 +1128,27 @@ Rules:
             predefined_domains=FORMATTED_DOMAINS_SIMPLE,
         )
 
+        # ── Detect disability for Phase 0 injection ─────────────
+        disability_ctx = self._extract_disability_context(user_profile)
+        if disability_ctx:
+            if current_step == 2:
+                system_prompt += (
+                    f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY CHECK-IN: The student's profile shows: {disability_ctx}."
+                    "\nThis is the first question of the deep-dive phase (after greeting and parents' professions)."
+                    "\nOpen with a warm, matter-of-fact acknowledgment of their condition and ask ONE open question"
+                    " about how it affects them in learning or school environments — so you can factor it into domain/subject selection."
+                    "\nExample: 'I noticed from your profile that you have [condition]. I want to make sure I suggest the most suitable subjects and domains for you — could you tell me a little about how it affects you day-to-day in school or learning?'"
+                    "\nDo NOT present multiple-choice options. Be warm and normalising. Never use words like 'limitation' or 'challenge' as the opener. Keep your response concise.]"
+                )
+            elif current_step == 3:
+                system_prompt += (
+                    f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY FOLLOW-UP: The student has {disability_ctx}."
+                    "\nReview their response to the disability check-in carefully:"
+                    "\n- If they mentioned specific impacts on their learning style (e.g., concentration, reading, quantitative tasks) — ask ONE targeted follow-up to understand what learning environments or study methods work best for them."
+                    "\n- If their previous answer was brief, positive, or indicates the condition doesn't significantly affect their learning — SKIP the follow-up and transition directly to the next profile field (Academic background / current grade level / school)."
+                    "\nDo NOT spend more than 2 turns on this phase. Naturally transition to asking about their academic background or favorite subjects. Keep your response concise.]"
+                )
+
         if language == 'hi':
             system_prompt += (
                 "\n\n[CRITICAL Hindi Instruction: You MUST respond in Hindi using the Devanagari script only. "
@@ -1093,6 +1204,27 @@ Rules:
             user_profile_context=format_user_profile_context(user_profile, user_name=user_name),
             predefined_domains=FORMATTED_DOMAINS_SIMPLE,
         )
+
+        # ── Detect disability for Phase 0 injection ─────────────
+        disability_ctx = self._extract_disability_context(user_profile)
+        if disability_ctx:
+            if current_step == 2:
+                system_prompt += (
+                    f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY CHECK-IN: The student's profile shows: {disability_ctx}."
+                    "\nThis is the first question of the deep-dive phase (after greeting and parents' professions)."
+                    "\nOpen with a warm, matter-of-fact acknowledgment of their condition and ask ONE open question"
+                    " about how it affects them in learning or school environments — so you can factor it into domain/subject selection."
+                    "\nExample: 'I noticed from your profile that you have [condition]. I want to make sure I suggest the most suitable subjects and domains for you — could you tell me a little about how it affects you day-to-day in school or learning?'"
+                    "\nDo NOT present multiple-choice options. Be warm and normalising. Never use words like 'limitation' or 'challenge' as the opener. Keep your response concise.]"
+                )
+            elif current_step == 3:
+                system_prompt += (
+                    f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY FOLLOW-UP: The student has {disability_ctx}."
+                    "\nReview their response to the disability check-in carefully:"
+                    "\n- If they mentioned specific impacts on their learning style (e.g., concentration, reading, quantitative tasks) — ask ONE targeted follow-up to understand what learning environments or study methods work best for them."
+                    "\n- If their previous answer was brief, positive, or indicates the condition doesn't significantly affect their learning — SKIP the follow-up and transition directly to the next profile field (Academic background / current grade level / school)."
+                    "\nDo NOT spend more than 2 turns on this phase. Naturally transition to asking about their academic background or favorite subjects. Keep your response concise.]"
+                )
 
         if language == 'hi':
             system_prompt += (

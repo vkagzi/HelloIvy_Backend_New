@@ -1257,13 +1257,47 @@ Generate your personalized opening:"""
         }
 
         learning = (personal.get("learningDifficulties", "") or "").strip()
+        learning_comments = (personal.get("learningDifficultiesComments", "") or "").strip()
         physical = (personal.get("physicalDisabilities", "") or "").strip()
+        physical_comments = (personal.get("physicalDisabilitiesComments", "") or "").strip()
 
         parts = []
+        # Check learning difficulty
+        has_learning = False
+        learning_desc = ""
         if learning and learning.lower() not in _no_learning:
-            parts.append(f"Learning difficulty: {learning}")
+            if "other" in learning.lower() and learning_comments:
+                learning_desc = learning_comments
+            else:
+                learning_desc = learning
+                if learning_comments:
+                    learning_desc += f" ({learning_comments})"
+            has_learning = True
+        elif learning_comments and learning_comments.lower() not in _no_learning:
+            learning_desc = learning_comments
+            has_learning = True
+
+        if has_learning and learning_desc:
+            parts.append(f"Learning difficulty: {learning_desc}")
+
+        # Check physical disability
+        has_physical = False
+        physical_desc = ""
         if physical and physical.lower() not in _no_disability:
-            parts.append(f"Physical disability: {physical}")
+            if "other" in physical.lower() and physical_comments:
+                physical_desc = physical_comments
+            else:
+                physical_desc = physical
+                if physical_comments:
+                    physical_desc += f" ({physical_comments})"
+            has_physical = True
+        elif physical_comments and physical_comments.lower() not in _no_disability:
+            physical_desc = physical_comments
+            has_physical = True
+
+        if has_physical and physical_desc:
+            parts.append(f"Physical disability: {physical_desc}")
+
         return "; ".join(parts)
 
     def _build_llm_messages(
