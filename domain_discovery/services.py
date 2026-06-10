@@ -47,6 +47,30 @@ DOMAIN_INTRO_MESSAGE_HI_FEMALE = (
 )
 
 
+def build_domain_intro_message(user_name: str, language: str = 'en', persona: str = 'male') -> str:
+    """Build a personalized intro message with the user's name for Stream & Subject Selection."""
+    if language == 'hi':
+        if persona == 'female':
+            return (
+                f"नमस्ते {user_name}, मैं आईवी हूँ—आपकी करियर और शिक्षा मार्गदर्शिका। "
+                f"इस मॉड्यूल में, मैं आपको यह जानने में मदद करूँगी कि कौन सा स्ट्रीम और विषय आपके लिए सबसे उपयुक्त हैं।\n\n"
+                f"कृपया ईमानदारी से उत्तर दें, यदि कुछ स्पष्ट न हो तो पूछें, और बहुविकल्पीय प्रश्नों के लिए बस A, B या C के साथ उत्तर दें।\n\n"
+                f"याद रखें, कोई सही या गलत उत्तर नहीं हैं—बस स्वाभाविक रहें। क्या हम शुरू करें?"
+            )
+        return (
+            f"नमस्ते {user_name}, मैं आईवी हूँ—आपका करियर और शिक्षा मार्गदर्शक। "
+            f"इस मॉड्यूल में, मैं आपको यह जानने में मदद करूँगा कि कौन सा स्ट्रीम और विषय आपके लिए सबसे उपयुक्त हैं।\n\n"
+            f"कृपया ईमानदारी से उत्तर दें, यदि कुछ स्पष्ट न हो तो पूछें, और बहुविकल्पीय प्रश्नों के लिए बस A, B या C के साथ उत्तर दें।\n\n"
+            f"याद रखें, कोई सही या गलत उत्तर नहीं हैं—बस स्वाभाविक रहें। क्या हम शुरू करें?"
+        )
+    return (
+        f"Hello {user_name}, I'm Ivy\u2014your career and education guide. "
+        f"In this module, I'll help you discover which Stream and Subjects fit you best.\n\n"
+        f"Please answer honestly, ask if anything is unclear, and for multiple-choice questions just reply with A, B, or C.\n\n"
+        f"Remember, there are no right or wrong answers\u2014just be yourself. Shall we get started?"
+    )
+
+
 class DomainDiscoveryService:
     """
     Service class for managing Stream & Subject Selection sessions and conversations.
@@ -383,10 +407,12 @@ class DomainDiscoveryService:
             language = user_instance.settings.get('voice_language', 'en').lower()
             persona = user_instance.settings.get('voice_persona', 'male').lower()
             
-        if language == 'hi':
-            intro_content = DOMAIN_INTRO_MESSAGE_HI_FEMALE if persona == 'female' else DOMAIN_INTRO_MESSAGE_HI_MALE
-        else:
-            intro_content = DOMAIN_INTRO_MESSAGE
+        user_name = get_user_display_name(None, user, 'there')
+        intro_content = build_domain_intro_message(
+            user_name=user_name,
+            language=language,
+            persona=persona
+        )
 
         # Static intro message — no LLM call needed
         DomainMessage.objects.create(

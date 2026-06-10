@@ -591,7 +591,8 @@ class SettingsView(UserDTOView):
             # 1. Domain Discovery
             try:
                 from domain_discovery.models import DomainSession, DomainMessage
-                from domain_discovery.services import DOMAIN_INTRO_MESSAGE, DOMAIN_INTRO_MESSAGE_HI_MALE, DOMAIN_INTRO_MESSAGE_HI_FEMALE
+                from domain_discovery.services import build_domain_intro_message
+                from utils.user_helpers import get_user_display_name
                 
                 active_domain_sess = DomainSession.objects.filter(user=user, is_active=True).order_by('-created_at').first()
                 if active_domain_sess and not active_domain_sess.is_completed:
@@ -601,10 +602,12 @@ class SettingsView(UserDTOView):
                         if first_msg:
                             lang = user.settings.get('voice_language', 'en').lower()
                             persona = user.settings.get('voice_persona', 'male').lower()
-                            if lang == 'hi':
-                                new_content = DOMAIN_INTRO_MESSAGE_HI_FEMALE if persona == 'female' else DOMAIN_INTRO_MESSAGE_HI_MALE
-                            else:
-                                new_content = DOMAIN_INTRO_MESSAGE
+                            user_name = get_user_display_name(None, user, 'there')
+                            new_content = build_domain_intro_message(
+                                user_name=user_name,
+                                language=lang,
+                                persona=persona
+                            )
                             first_msg.content = new_content
                             first_msg.save(update_fields=['content'])
             except Exception as e:
