@@ -815,6 +815,8 @@ class DomainDiscoveryService:
                 why_recommended=rec_data.get('why_recommended', ''),
                 exploration_activities=rec_data.get('exploration_activities', []),
                 potential_careers=rec_data.get('potential_careers', []),
+                feasibility=rec_data.get('feasibility', {}),
+                skill_gaps=rec_data.get('skill_gaps', []),
                 rank=idx + 1
             )
             recommendations.append(rec)

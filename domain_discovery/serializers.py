@@ -64,6 +64,7 @@ class DomainRecommendationSerializer(serializers.ModelSerializer):
             'key_interests', 'sub_domains', 'related_subjects',
             'description',
             'why_recommended', 'exploration_activities', 'potential_careers', 
+            'feasibility', 'skill_gaps',
             'rank', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']

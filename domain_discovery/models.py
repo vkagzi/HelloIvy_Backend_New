@@ -156,6 +156,16 @@ class DomainRecommendation(models.Model):
     why_recommended = models.TextField(blank=True)
     exploration_activities = models.JSONField(default=list)  # Activities to explore this domain
     potential_careers = models.JSONField(default=list)  # Preview of career paths in this domain
+    feasibility = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Feasibility metric: {level: High|Medium|Low, reason: str}"
+    )
+    skill_gaps = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Top 5 personalised skill gaps (areas of growth) for this domain given the student's profile"
+    )
     rank = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

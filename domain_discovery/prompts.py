@@ -363,7 +363,8 @@ Use this strategic rotation to ensure diversity across {min_questions}-{max_ques
 EARLY QUESTIONS (Questions 1-10): PROFILE-DRIVEN EXPLORATION
 - Question 1: Profile confirmation (mandatory first question above)
 - Question 2: Family background influences (mandatory second question above)
-- From Question 3 onward: Systematically probe the student's OWN profile information IN THE ORDER it was entered. Walk through each profile field sequentially and ask questions that dig deeper into what the student actually filled in. You may ask UP TO 8 questions (Q3–Q10) on profile fields — ask as many as needed to feel confident you've understood each field. Move to the MIDDLE phase as soon as all non-empty fields are covered, even if you haven't reached Q10. The order of profile fields to follow is:
+- PHASE 0 — DISABILITY CHECK-IN (Questions 3-4, only when applicable): If the student's profile lists a learning difficulty or physical disability, ask 1-2 questions at the start of the deep-dive phase to understand how it affects their learning, so you can customize domain recommendations.
+- From Question 3 (or 5, if disability check-in occurred) onward: Systematically probe the student's OWN profile information IN THE ORDER it was entered. Walk through each profile field sequentially and ask questions that dig deeper into what the student actually filled in. You may ask UP TO 8 questions on profile fields — ask as many as needed to feel confident you've understood each field. Move to the MIDDLE phase as soon as all non-empty fields are covered, even if you haven't reached Q10. The order of profile fields to follow is:
     1. Academic background / current grade level / school
     2. Subjects or courses (favorite subjects, chosen stream, AP/IB/specialized courses)
     3. Standardized test scores and academic performance
@@ -486,6 +487,17 @@ For each of the 5 domains, provide:
 - why_recommended: 2-3 sentences connecting their specific responses to this domain
 - exploration_activities: 3-5 concrete activities to explore this domain
 - potential_careers: 3-5 career paths (not specific job titles)
+- feasibility: An object with two keys:
+  * level: One of "High", "Medium", or "Low" — representing how realistically achievable success in this domain is for THIS specific student given their current profile, education level, school board/curriculum, location, and any constraints or disabilities mentioned.
+    - High: The student already has the foundational profile, background, subjects, and realistic pathway. Minimal major barriers.
+    - Medium: The domain is achievable but requires overcoming 1-2 significant gaps (e.g., taking an extra subject, developing new academic habits, relocating). Doable with deliberate effort.
+    - Low: There are substantial barriers — multiple missing prerequisites, significant financial constraints, geographic limitations, or fundamental profile mismatches that make this domain/stream genuinely hard to pursue for this particular student.
+  * reason: A 1-2 sentence explanation tied DIRECTLY to the student's profile and background. Cite the specific factors.
+- skill_gaps: A list of EXACTLY 5 strings — highly personalised areas of growth (skill/academic gaps) for this domain derived using this strict process:
+  * STEP 1 — What does this domain actually require? List the core academic, technical, and cognitive skills this domain demands.
+  * STEP 2 — What does THIS specific student already have? Audit their profile and conversation for evidence of existing skills, subjects, activities, and any learning/physical disabilities.
+  * STEP 3 — Compute the real gap and phrase it as a SHORT NOUN PHRASE (4-10 words) custom-written for this specific student's background (e.g., "Advanced math preparation beyond your commerce stream", "Coding foundation beyond your block-based Scratch projects").
+  * DISABILITY-AWARE GAP (only when applicable): If the student's profile lists a learning difficulty or physical disability AND this domain's core demands are directly impacted by that condition, include ONE gap that honestly names the challenge (e.g., "Developing dyslexia-compatible reading strategies for text-heavy domains", "Implementing ADHD focus management workflows for long-duration study sessions", "Developing alternative tools/accommodations for physical mobility in lab-based domains"). This gap must be omitted if not applicable.
 </output_requirements>
 
 <output_verbosity_spec>
