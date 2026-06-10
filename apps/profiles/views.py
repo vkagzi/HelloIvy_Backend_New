@@ -996,7 +996,7 @@ UNIVERSITY SEMESTER/YEAR-WISE SCORES (CRITICAL - DO NOT SKIP):
   * For a standard 2-year Master's degree, expect 4 Semesters or 2 Years.
   * IF you extract 8 items, it is almost certainly a semester-wise breakdown; set `hasSemesterWiseScores` to "Yes".
 - Extract each semester or year as an object in the `semesters` array with fields `semesterName`, `sgpa`, and `maxSgpa`.
-- Each semester object: { "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }. 
+- Each semester object: {{ "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }}. 
 - Use "1st Semester", "2nd Semester", etc. for semesters.
 - Use "1st Year", "2nd Year", etc. for years.
 - DO NOT mix semester names with year-wise data. If you have 8 items, they MUST be labeled as Semesters.
