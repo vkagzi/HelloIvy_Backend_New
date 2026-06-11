@@ -243,6 +243,10 @@ class CollegeSelectorService:
         import json
         from asgiref.sync import sync_to_async
         
+        # Load session with user pre-fetched to avoid SynchronousOnlyOperation errors
+        session_id = session.session_id
+        session = await sync_to_async(CollegeSelectorSession.objects.select_related('user').get)(session_id=session_id)
+        
         current_step = session.current_step
 
         # Access Check: Admins and paid users get full access, others capped at 5
