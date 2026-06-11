@@ -436,6 +436,25 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
                 
         return "\n\n".join(directives)
 
+    def get_transcription_prompt(self) -> Optional[str]:
+        """Get the prompt for input audio transcription to guide Whisper/STT model.
+        Helps improve accuracy for accents, technical terms, boards, and disabilities.
+        """
+        lang = getattr(self, 'language', 'en')
+        if lang == 'hi':
+            return (
+                "एक भारतीय छात्र करियर, स्ट्रीम, विषयों, स्कूल बोर्ड (CBSE, ICSE, IB, IGCSE), "
+                "कॉलेज डिग्री (B.Tech, BBA, MBA, BSBE, MBBS) और सीखने की कठिनाइयों जैसे Dyslexia, ADHD, "
+                "Autism, Dyscalculia, Dysgraphia के बारे में बात कर रहा है। ब्रांड नाम: HelloIvy, ReachIvy।"
+            )
+        else:
+            return (
+                "An Indian student talking about career interests, stream and subject selection, "
+                "academic boards (CBSE, ICSE, IB, IGCSE, HSC, NIOS, ISC, state board), university degrees "
+                "(B.Tech, BBA, MBA, BSBE, MBBS), and learning or physical difficulties (Dyslexia, ADHD, "
+                "Dyscalculia, Autism, Dysgraphia). Brand names: HelloIvy, ReachIvy."
+            )
+
     async def configure_openai_session(self):
         """Send initial session configuration to OpenAI with custom instructions"""
         try:
@@ -460,6 +479,7 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
                     "input_audio_transcription": {
                         "model": transcription_model,
                         "language": getattr(self, 'language', 'en'),
+                        "prompt": self.get_transcription_prompt(),
                     },
                     "input_audio_noise_reduction": self.get_noise_reduction_config(),
                     "turn_detection": self.get_turn_detection_config(),
@@ -709,7 +729,7 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer, ABC):
             {"type": "far_field"} for laptop or conference room microphones,
             or None to disable noise reduction.
         """
-        return {"type": "near_field"}
+        return None
     
     def get_turn_detection_config(self) -> Dict[str, Any]:
         """Get turn detection configuration. Override to customize.
