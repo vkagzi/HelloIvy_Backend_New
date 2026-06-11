@@ -1180,7 +1180,7 @@ Rules:
         # ── Detect disability for Phase 0 injection ─────────────
         disability_ctx = self._extract_disability_context(user_profile)
         if disability_ctx:
-            if current_step == 2:
+            if current_step == 3:
                 system_prompt += (
                     f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY CHECK-IN: The student's profile shows: {disability_ctx}."
                     "\nThis is the first question of the deep-dive phase (after greeting and parents' professions)."
@@ -1189,7 +1189,7 @@ Rules:
                     "\nExample: 'I noticed from your profile that you have [condition]. I want to make sure I suggest the most suitable subjects and domains for you — could you tell me a little about how it affects you day-to-day in school or learning?'"
                     "\nDo NOT present multiple-choice options. Be warm and normalising. Never use words like 'limitation' or 'challenge' as the opener. Keep your response concise.]"
                 )
-            elif current_step == 3:
+            elif current_step == 4:
                 system_prompt += (
                     f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY FOLLOW-UP: The student has {disability_ctx}."
                     "\nReview their response to the disability check-in carefully:"
@@ -1257,7 +1257,7 @@ Rules:
         # ── Detect disability for Phase 0 injection ─────────────
         disability_ctx = self._extract_disability_context(user_profile)
         if disability_ctx:
-            if current_step == 2:
+            if current_step == 3:
                 system_prompt += (
                     f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY CHECK-IN: The student's profile shows: {disability_ctx}."
                     "\nThis is the first question of the deep-dive phase (after greeting and parents' professions)."
@@ -1266,7 +1266,7 @@ Rules:
                     "\nExample: 'I noticed from your profile that you have [condition]. I want to make sure I suggest the most suitable subjects and domains for you — could you tell me a little about how it affects you day-to-day in school or learning?'"
                     "\nDo NOT present multiple-choice options. Be warm and normalising. Never use words like 'limitation' or 'challenge' as the opener. Keep your response concise.]"
                 )
-            elif current_step == 3:
+            elif current_step == 4:
                 system_prompt += (
                     f"\n\n[MANDATORY STEP INSTRUCTION - PHASE 0 — DISABILITY FOLLOW-UP: The student has {disability_ctx}."
                     "\nReview their response to the disability check-in carefully:"

@@ -485,7 +485,8 @@ class DomainDiscoveryService:
         #     yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
         #     return
 
-        new_step = int(session.current_step) + 1        
+        current_step = int(session.current_step)
+        new_step = current_step + 1        
         # Save user message (since this is async, we use sync_to_async or just run in sync context for simple DB ops if needed)
         # But for streaming, we want to start yielding as soon as possible.
         
