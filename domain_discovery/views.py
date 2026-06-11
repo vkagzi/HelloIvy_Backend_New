@@ -1114,6 +1114,9 @@ class DomainEmailReportView(APIView):
             if not session or not session.user or session.user.id != user.id:
                 return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
                 
+            if session.metadata.get('report_emailed'):
+                return Response({'message': 'Report already emailed'}, status=status.HTTP_200_OK)
+                
             report_pdf = request.FILES.get('pdf')
             if not report_pdf:
                 return Response({'error': 'PDF file is required'}, status=status.HTTP_400_BAD_REQUEST)
