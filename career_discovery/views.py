@@ -325,24 +325,27 @@ class CareerMessageStreamView(APIView):
                     try:
                         async def consume():
                             try:
+                                logger.info(f"Starting career stream for session {session.session_id}")
                                 async for chunk in career_discovery_service.process_message_stream(session, content):
-                                    # Ensure chunk is properly formatted as SSE
                                     if not chunk.endswith('\n\n'):
                                         chunk += '\n\n'
+                                    logger.debug(f"Yielding chunk: {chunk[:50]}...")
                                     q.put(chunk)
+                                logger.info(f"Career stream finished successfully for {session.session_id}")
                             except Exception as e:
                                 import traceback
                                 traceback.print_exc()
+                                logger.error(f"Error in career stream consume: {str(e)}")
                                 error_msg = f"data: {json.dumps({'error': str(e)})}\n\n"
                                 q.put(error_msg)
                             finally:
                                 q.put(None)
 
-                        # Use asyncio.run for a clean, isolated event loop in this thread
                         asyncio.run(consume())
                     except Exception as e:
                         import traceback
                         traceback.print_exc()
+                        logger.error(f"Error in career stream run_async: {str(e)}")
                         q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
                         q.put(None)
 

@@ -420,18 +420,6 @@ class CustomModuleListCreateView(APIView):
         serializer = CustomModuleSerializer(data=request.data)
         if serializer.is_valid():
             custom_module = serializer.save()
-            price_val = request.data.get("price")
-            if price_val is not None and str(price_val).strip() != "":
-                from .models import ModulePricing
-                ModulePricing.objects.update_or_create(
-                    module_name=custom_module.value,
-                    school__isnull=True,
-                    user__isnull=True,
-                    defaults={
-                        "price": price_val,
-                        "is_active": True
-                    }
-                )
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
