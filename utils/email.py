@@ -26,7 +26,9 @@ def send_otp_email(email: str, otp_code: str) -> None:
     print(f"[EMAIL] Sending OTP to {to}: {otp_code}")
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 32px; background-color: #ffffff;">
-      <div style="text-align: center; margin-bottom: 28px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <img src="https://helloivy.ai/images/iconGIF.gif" alt="HelloIvy" style="width: 60px; height: auto; margin-bottom: 12px;">
+        <br/>
         <span style="font-size: 26px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #6c3be4;">ivy</span></span>
       </div>
       <h2 style="color: #1a1a2e; font-size: 20px; font-weight: 700; margin-bottom: 8px;">Your OTP Code &#128274;</h2>
@@ -185,7 +187,9 @@ def send_payment_pending_email(
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 32px; background: #ffffff; border: 1px solid #eeeeee; border-radius: 16px;">
       <div style="text-align: center; margin-bottom: 32px;">
-        <span style="font-size: 28px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #7B0012;">ivy</span></span>
+        <img src="https://helloivy.ai/images/iconGIF.gif" alt="HelloIvy" style="width: 60px; height: auto; margin-bottom: 12px;">
+        <br/>
+        <span style="font-size: 28px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #6c3be4;">ivy</span></span>
       </div>
       
       <h2 style="color: #1a1a2e; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Payment Pending &#8987;</h2>
@@ -202,7 +206,7 @@ def send_payment_pending_email(
       <p style="color: #555; font-size: 15px; line-height: 1.6; margin-top: 24px;">Don't worry! We'll automatically update your account once the payment is confirmed. If the amount was debited from your account but remains pending for more than 24 hours, please contact us.</p>
 
       <div style="margin-top: 32px; text-align: center;">
-        <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #7B0012; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Check Status</a>
+        <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #6c3be4; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Check Status</a>
       </div>
 
       <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0;" />
@@ -232,7 +236,9 @@ def send_chatbot_report_email(
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 32px; background: #ffffff; border: 1px solid #eeeeee; border-radius: 16px;">
       <div style="text-align: center; margin-bottom: 32px;">
-        <span style="font-size: 28px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #7B0012;">ivy</span></span>
+        <img src="https://helloivy.ai/images/iconGIF.gif" alt="HelloIvy" style="width: 60px; height: auto; margin-bottom: 12px;">
+        <br/>
+        <span style="font-size: 28px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px;">hello<span style="color: #6c3be4;">ivy</span></span>
       </div>
       
       <h2 style="color: #1a1a2e; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Your {module_name} Report is Ready! &#127881;</h2>
@@ -242,7 +248,7 @@ def send_chatbot_report_email(
 
       <div style="margin-top: 32px; text-align: center; padding: 24px; background: #f9fafb; border-radius: 12px;">
         <p style="margin: 0 0 16px; font-size: 14px; color: #555;">You can also access your full interactive discovery results anytime on the HelloIvy dashboard.</p>
-        <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #7B0012; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Go to Dashboard</a>
+        <a href="https://helloivy.ai" style="display: inline-block; padding: 12px 32px; background: #6c3be4; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 15px;">Go to Dashboard</a>
       </div>
 
       <p style="color: #888; font-size: 13px; margin-top: 32px; text-align: center;">Best of luck with your journey!</p>

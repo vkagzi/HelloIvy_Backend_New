@@ -668,6 +668,55 @@ Generate the opening message:"""
 
         return llm_messages
 
+    async def astream_question(
+        self,
+        current_step: int,
+        user_message: str = None,
+        messages: List[Dict[str, Any]] = None,
+        user_profile: Dict[str, Any] = None,
+        min_questions: int = 25,
+        max_questions: int = 35,
+        session_notes: str = "",
+        token_usage: Dict = None,
+        user_name: str = "",
+        language: str = 'en',
+    ):
+        """Async stream a question for any step number."""
+        try:
+            prompt_data = self.build_prompt_for_step(
+                step=current_step,
+                user_profile=user_profile,
+                min_questions=min_questions,
+                max_questions=max_questions,
+                session_notes=session_notes,
+                user_name=user_name,
+                language=language,
+            )
+
+            llm_messages = self._build_llm_messages(
+                prompt_data, current_step,
+                user_response=user_message,
+                messages=messages,
+            )
+
+            # Log LLM messages (sanitized)
+            log_llm_messages(logger, llm_messages)
+
+            # Stream chunks from the LLM asynchronously
+            async for chunk in self.llm.astream(llm_messages):
+                content = chunk.content
+                if isinstance(content, list):
+                    delta = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
+                else:
+                    delta = str(content)
+                
+                if delta:
+                    yield delta
+
+        except Exception as e:
+            logger.error(f"Error in astream_question at step {current_step}: {e}", exc_info=True)
+            raise
+
     def stream_question(
         self,
         step: int,

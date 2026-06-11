@@ -312,43 +312,58 @@ class DomainMessageStreamView(APIView):
                     content_type='application/json'
                 )
 
+            import asyncio
+
             def sync_stream():
-                q = queue.Queue()
+                """
+                Drive the async generator from a synchronous context.
 
-                def run_async():
-                    import asyncio
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
-                    async def consume():
-                        try:
-                            async for chunk in domain_discovery_service.process_message_stream(session, content):
-                                q.put(chunk)
-                        except Exception as e:
-                            q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
-                        finally:
-                            q.put(None)
-                    
-                    loop.run_until_complete(consume())
-                    loop.close()
+                We use asyncio.run() inside a background thread so that
+                sync_to_async() calls inside process_message_stream() get
+                their own dedicated event loop — preventing deadlocks that
+                occur when a new loop tries to delegate work to Django's
+                main-thread event loop that is already blocked waiting for
+                the StreamingHttpResponse generator.
+                """
+                result_queue = queue.Queue()
 
-                thread = threading.Thread(target=run_async)
-                thread.start()
+                async def _collect():
+                    try:
+                        print(f"DEBUG: Starting collection for session {session.session_id}")
+                        async for chunk in domain_discovery_service.process_message_stream(session, content):
+                            print(f"DEBUG: Received chunk: {chunk[:20]}...")
+                            result_queue.put(chunk)
+                        print(f"DEBUG: Finished collection for session {session.session_id}")
+                    except Exception as e:
+                        import traceback
+                        print(f"DEBUG: Error in collection: {e}")
+                        traceback.print_exc() # Print to server console
+                        result_queue.put(
+                            f"data: {json.dumps({'error': str(e)})}\n\n"
+                        )
+                    finally:
+                        result_queue.put(None)  # sentinel
+
+                def _run():
+                    asyncio.run(_collect())
+
+                t = threading.Thread(target=_run, daemon=True)
+                t.start()
 
                 while True:
-                    chunk = q.get()
-                    if chunk is None:
+                    item = result_queue.get()
+                    if item is None:
                         break
-                    yield chunk
+                    yield item
 
-                thread.join()
+                t.join()
 
             response = StreamingHttpResponse(
                 sync_stream(),
                 content_type='text/event-stream'
             )
             response['Cache-Control'] = 'no-cache'
-            response['X-Accel-Buffering'] = 'no'  # Disable buffering for Nginx
+            response['X-Accel-Buffering'] = 'no'
             return response
 
         except Exception as e:
@@ -1098,6 +1113,9 @@ class DomainEmailReportView(APIView):
             session = domain_discovery_service.get_session_by_id(session_id)
             if not session or not session.user or session.user.id != user.id:
                 return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+            if session.metadata.get('report_emailed'):
+                return Response({'message': 'Report already emailed'}, status=status.HTTP_200_OK)
                 
             report_pdf = request.FILES.get('pdf')
             if not report_pdf:
