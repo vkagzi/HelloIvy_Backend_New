@@ -988,11 +988,19 @@ STRICT RULES:
 
 UNIVERSITY SEMESTER/YEAR-WISE SCORES (CRITICAL - DO NOT SKIP):
 - For any College/Undergraduate, Postgraduate, or Working Professional record, if the transcript contains semester-wise or year-wise GPA/SGPA/scores, you MUST extract them.
-- IMPORTANT: Set `hasSemesterWiseScores` to "Yes" if the data is a semester-wise breakdown (e.g., Semester 1, 2...), or "No" if it is a year-wise breakdown (e.g., Year 1, 2...).
-- IMPORTANT: The `overallPercentage` field should ONLY contain the FINAL CUMULATIVE GPA/Percentage for the entire degree. Do NOT put the score of a single semester or year in this field if multiple semesters/years are present.
+- SET `hasSemesterWiseScores`: 
+  * "Yes" if the items are Semesters (usually 2 per year, e.g., 1st to 8th Semester for a 4-year degree).
+  * "No" if the items are Years (usually 1 per year, e.g., 1st to 4th Year for a 4-year degree).
+- SEMESTER COUNT LOGIC:
+  * For a standard 4-year Bachelor's degree (B.E., B.Tech, B.A., B.Sc, B.Com), expect 8 Semesters or 4 Years.
+  * For a standard 2-year Master's degree, expect 4 Semesters or 2 Years.
+  * CRITICAL: IF you extract 8 items for a Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; you MUST set `hasSemesterWiseScores` to "Yes". It is almost impossible to have an 8-year Bachelor's degree.
+  * IF you extract 6 items for a 3-year Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; set `hasSemesterWiseScores` to "Yes".
 - Extract each semester or year as an object in the `semesters` array with fields `semesterName`, `sgpa`, and `maxSgpa`.
-- Each semester object: {{ "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }}. The `semesterName` should be "1st Semester", "2nd Semester", etc. for semesters, or "1st Year", "2nd Year", etc. for years.
-- Look for "Semester GPA (SGPA)", "SGPA", "GPA", "CGPA", "Term GPA" values in each semester/year section. Extract the numeric value only (e.g. "8.75 / 10.00" -> sgpa: 8.75, maxSgpa: 10.0).
+- Each semester object: {{ "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }}. 
+- Use "1st Semester", "2nd Semester", etc. for semesters.
+- Use "1st Year", "2nd Year", etc. for years.
+- DO NOT mix semester names with year-wise data. If you have 8 items, they MUST be labeled as Semesters, and `hasSemesterWiseScores` MUST be "Yes".
 - This is MANDATORY. If 8 semesters are in the transcript, the `semesters` array must have 8 entries.
 
 JSON STRUCTURE:
