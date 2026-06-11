@@ -322,31 +322,44 @@ class CareerMessageStreamView(APIView):
 
                 def run_async():
                     import asyncio
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
-                    async def consume():
-                        try:
-                            async for chunk in career_discovery_service.process_message_stream(session, content):
-                                q.put(chunk)
-                        except Exception as e:
-                            q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
-                        finally:
-                            q.put(None)
-                    
-                    loop.run_until_complete(consume())
-                    loop.close()
+                    try:
+                        async def consume():
+                            try:
+                                async for chunk in career_discovery_service.process_message_stream(session, content):
+                                    # Ensure chunk is properly formatted as SSE
+                                    if not chunk.endswith('\n\n'):
+                                        chunk += '\n\n'
+                                    q.put(chunk)
+                            except Exception as e:
+                                import traceback
+                                traceback.print_exc()
+                                error_msg = f"data: {json.dumps({'error': str(e)})}\n\n"
+                                q.put(error_msg)
+                            finally:
+                                q.put(None)
 
-                thread = threading.Thread(target=run_async)
+                        # Use asyncio.run for a clean, isolated event loop in this thread
+                        asyncio.run(consume())
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
+                        q.put(None)
+
+                thread = threading.Thread(target=run_async, daemon=True)
                 thread.start()
 
                 while True:
-                    chunk = q.get()
-                    if chunk is None:
+                    try:
+                        chunk = q.get(timeout=60) # Timeout to prevent infinite wait
+                        if chunk is None:
+                            break
+                        yield chunk
+                    except queue.Empty:
                         break
-                    yield chunk
 
-                thread.join()
+                if thread.is_alive():
+                    thread.join(timeout=1)
 
             return StreamingHttpResponse(
                 sync_stream(),

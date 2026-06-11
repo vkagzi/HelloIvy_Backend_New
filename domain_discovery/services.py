@@ -11,6 +11,7 @@ from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
 
+from asgiref.sync import sync_to_async
 logger = logging.getLogger(__name__)
 
 from utils.message_constants import MessageType
@@ -129,6 +130,11 @@ class DomainDiscoveryService:
 
     def _get_riasec_question(self, category: str, question_number: int) -> Dict[str, Any]:
         """Get a RIASEC question from constants based on category and number"""
+        try:
+            from .constants import RIASEC_CONFIG
+        except ImportError:
+            RIASEC_CONFIG = {"categories": {}}
+        
         categories = RIASEC_CONFIG.get("categories", {})
         category_data = categories.get(category, categories.get("school_students"))
         questions = category_data.get("questions", [])
@@ -464,21 +470,24 @@ class DomainDiscoveryService:
         """
         Async generator that yields SSE-formatted JSON chunks.
         """
+        # Ensure we have the latest session and avoid lazy-load issues in new loop
+        session_id = session.session_id
+        session = await sync_to_async(DomainSession.objects.get)(session_id=session_id)
+        
         # Cache values that trigger DB queries
         # Access Check: Admins and paid users get full access, others capped at 5
-        from apps.accounts.services import check_module_access
-        access_info = await sync_to_async(check_module_access)(session.user, "domain_discovery")
+        # from apps.accounts.services import check_module_access
+        # access_info = await sync_to_async(check_module_access)(session.user, "domain_discovery")
         
-        if access_info["access"] == "trial" and access_info["current_usage"] >= access_info["limit"]:
-            # Trial limit reached
-            lock_message = "Purchase to continue this module"
-            yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
-            return
+        # if access_info["access"] == "trial" and access_info["current_usage"] >= access_info["limit"]:
+        #     # Trial limit reached
+        #     lock_message = "Purchase to continue this module"
+        #     yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
+        #     return
 
-        new_step = current_step + 1        
+        new_step = int(session.current_step) + 1        
         # Save user message (since this is async, we use sync_to_async or just run in sync context for simple DB ops if needed)
         # But for streaming, we want to start yielding as soon as possible.
-        from asgiref.sync import sync_to_async
         
         await sync_to_async(DomainMessage.objects.create)(
             session=session,
@@ -585,7 +594,7 @@ class DomainDiscoveryService:
 
         # ── Step 3: Stream and Generate response ──────────
         if not is_complete and not bot_response:
-            all_messages = await sync_to_async(self.get_session_messages)(session) if new_step >= 2 else None
+            all_messages = await sync_to_async(self.get_session_messages)(session)
             user_profile = await sync_to_async(get_user_profile_data)(session.user)
             user_name = await sync_to_async(get_user_display_name)(None, session.user, '')
             
@@ -595,7 +604,7 @@ class DomainDiscoveryService:
             # Use LangChain astream for true async delivery
             async for chunk in self.langchain_service.astream_question(
                 current_step=new_step,
-                user_message=user_message if new_step >= 2 else "",
+                user_message=user_message,
                 messages=all_messages,
                 user_profile=user_profile,
                 min_questions=self.min_deepdive_questions,

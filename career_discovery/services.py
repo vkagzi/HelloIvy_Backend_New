@@ -343,14 +343,14 @@ class CareerDiscoveryService:
         current_step = int(session.current_step)
 
         # Access Check: Admins and paid users get full access, others capped at 5
-        from apps.accounts.services import check_module_access
-        access_info = await sync_to_async(check_module_access)(session.user, "career_discovery")
+        # from apps.accounts.services import check_module_access
+        # access_info = await sync_to_async(check_module_access)(session.user, "career_discovery")
         
-        if access_info["access"] == "trial" and access_info["current_usage"] >= access_info["limit"]:
-            # Trial limit reached
-            lock_message = "Purchase to continue this module"
-            yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
-            return
+        # if access_info["access"] == "trial" and access_info["current_usage"] >= access_info["limit"]:
+        #     # Trial limit reached
+        #     lock_message = "Purchase to continue this module"
+        #     yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
+        #     return
 
         new_step = current_step + 1
         session.current_step = new_step
