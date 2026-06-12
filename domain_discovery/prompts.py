@@ -107,6 +107,34 @@ Focus on asking the best possible question to narrow down the student's domain f
 </student_profile>
 """)
     .add_module_section("""
+<sparse_profile_handling>
+IMPORTANT: Do NOT assume that a sparse or incomplete profile means the student has no potential, interests, or direction. The absence of formal activities in a profile does NOT mean the absence of relevant experience.
+
+IF the student's profile is thin (few or no extracurriculars, activities, courses, or stated interests):
+- Do NOT rush to generic questions or make assumptions
+- Use the conversation itself to actively uncover signals across these areas:
+  * Academic subjects they enjoy or find boring
+  * Courses or classes they have taken or are taking
+  * Everyday activities and daily routines
+  * Hobbies and personal interests (however informal)
+  * Online content they consume (YouTube, podcasts, social media topics)
+  * Problems or puzzles they enjoy solving
+  * Preferred ways of working (alone vs. with others, structured vs. open-ended)
+  * Causes, topics, or issues they genuinely care about
+  * Hypothetical preferences ("If you had a free Saturday with no plans, what would you spend it on?")
+
+Treat ALL of the following as equally valid and meaningful signals for domain recommendations:
+- Informal experiences and personal interests
+- Family responsibilities (e.g., helping run a family business, caring for siblings)
+- Independent projects (personal builds, creative work, self-directed learning)
+- Gaming, content creation, reading habits, and sports
+- Online learning and self-taught skills
+- Casual conversations with family or friends about topics they find interesting
+
+NEVER penalize a student in your recommendations for having a sparse formal profile. Your job is to surface potential, not confirm pre-existing achievement.
+</sparse_profile_handling>
+""")
+    .add_module_section("""
 <theme_diversity_requirements>
 CRITICAL: You MUST NOT repeat themes that have already been explored.
 
@@ -522,6 +550,7 @@ For each of the 5 domains, provide:
   * STEP 2 — What does THIS specific student already have? Audit their profile and conversation for evidence of existing skills, subjects, activities, and any learning/physical disabilities.
   * STEP 3 — Compute the real gap and phrase it as a SHORT NOUN PHRASE (4-10 words) custom-written for this specific student's background (e.g., "Advanced math preparation beyond your commerce stream", "Coding foundation beyond your block-based Scratch projects").
   * DISABILITY-AWARE GAP (only when applicable): If the student's profile lists a learning difficulty or physical disability AND this domain's core demands are directly impacted by that condition, include ONE gap that honestly names the challenge (e.g., "Developing dyslexia-compatible reading strategies for text-heavy domains", "Implementing ADHD focus management workflows for long-duration study sessions", "Developing alternative tools/accommodations for physical mobility in lab-based domains"). This gap must be omitted if not applicable.
+  * LOW GRADE FLAG (mandatory when applicable): Always analyze the subjects and grades provided in the student's profile. If the student has a low grade in any subject that is directly relevant to this recommended domain, you MUST include it as one of the 5 skill_gaps entries. Write it as a short noun phrase (4-10 words) that names the subject, the grade concern, and why it matters for this domain. Examples of the correct format: "Low Math grade — core gap for Engineering stream", "Below-average Chemistry score affecting Science domain readiness", "Weak English performance limiting fit for Law and Humanities". Do NOT omit this even if the domain is otherwise a strong match — a low grade in a relevant subject is a real gap the student must be aware of.
 </output_requirements>
 
 <output_verbosity_spec>
