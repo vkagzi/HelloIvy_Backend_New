@@ -379,10 +379,15 @@ ALLOWED_LEVELS = [
     "AP",
     "Advanced",
     "Core",
+    "Dual Enrollment",
     "Extended",
+    "Foundation",
+    "Higher (HL)",
     "Higher",
     "Honors",
+    "Standard (SL)",
     "Standard",
+    "Other",
 ]
 
 def normalize_level(level_name: str) -> str:
@@ -405,18 +410,26 @@ def normalize_level(level_name: str) -> str:
         return "A Level"
     if lvl_upper in ["AP", "ADVANCED PLACEMENT"]:
         return "AP"
+    if lvl_upper in ["DUAL ENROLLMENT", "DUAL_ENROLLMENT"]:
+        return "Dual Enrollment"
     if "ADVANCED" in lvl_upper:
         return "Advanced"
     if "CORE" in lvl_upper:
         return "Core"
     if "EXTENDED" in lvl_upper:
         return "Extended"
-    if "HIGHER" in lvl_upper or lvl_upper == "HL":
+    if "HIGHER (HL)" in lvl_upper or lvl_upper == "HIGHER (HL)" or lvl_upper == "HL":
+        return "Higher (HL)"
+    if "HIGHER" in lvl_upper:
         return "Higher"
     if "HONOR" in lvl_upper:
         return "Honors"
-    if "STANDARD" in lvl_upper or lvl_upper == "SL":
+    if "STANDARD (SL)" in lvl_upper or lvl_upper == "STANDARD (SL)" or lvl_upper == "SL":
+        return "Standard (SL)"
+    if "STANDARD" in lvl_upper:
         return "Standard"
+    if lvl_upper == "OTHER":
+        return "Other"
         
     return "Not Applicable"
 

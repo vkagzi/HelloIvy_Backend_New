@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import SimpleTestCase
 from apps.profiles.views import (
     normalize_board,
     normalize_degree,
@@ -7,7 +7,7 @@ from apps.profiles.views import (
     normalize_grounded_dropdowns
 )
 
-class BoardNormalizationTestCase(TestCase):
+class BoardNormalizationTestCase(SimpleTestCase):
     def test_normalize_board_direct_match(self):
         # Case insensitive direct match
         val, other = normalize_board("CBSE")
@@ -159,7 +159,7 @@ class BoardNormalizationTestCase(TestCase):
 
     def test_normalize_level(self):
         self.assertEqual(normalize_level("AS"), "AS Level")
-        self.assertEqual(normalize_level("HL"), "Higher")
+        self.assertEqual(normalize_level("HL"), "Higher (HL)")
         self.assertEqual(normalize_level("unknown"), "Not Applicable")
 
     def test_normalize_grounded_dropdowns_recursive(self):
@@ -204,7 +204,7 @@ class BoardNormalizationTestCase(TestCase):
             ],
             "subjects": [
                 {
-                    "level": "Higher"
+                    "level": "Higher (HL)"
                 }
             ]
         }

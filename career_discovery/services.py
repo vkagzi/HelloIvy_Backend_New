@@ -380,7 +380,7 @@ class CareerDiscoveryService:
             session.metadata = metadata
             is_complete = True
             bot_response_full = await sync_to_async(self._handle_pre_final_response)(session, user_message)
-            yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True})}\n\n"
+            yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True, 'questions_completed': new_step, 'progress_percentage': 100})}\n\n"
         else:
             is_complete = new_step >= self.total_steps
 
@@ -390,10 +390,11 @@ class CareerDiscoveryService:
                 metadata['pre_final_asked'] = True
                 session.metadata = metadata
                 bot_response_full = PRE_FINAL_QUESTION
-                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': False})}\n\n"
+                progress_percentage = min(100, int((new_step / session.total_steps) * 100))
+                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
             elif is_complete:
                 bot_response_full = CONCLUSION_MSG
-                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True})}\n\n"
+                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True, 'questions_completed': new_step, 'progress_percentage': 100})}\n\n"
             else:
                 # Actual LLM stream
                 all_messages = await sync_to_async(self.get_session_messages)(session)
@@ -403,6 +404,9 @@ class CareerDiscoveryService:
                 token_usage = {}
 
                 user_name = await sync_to_async(get_user_display_name)(None, session.user, 'there')
+
+                total_steps = session.total_steps if session.total_steps > 0 else self.total_steps
+                progress_percentage = min(100, int((new_step / total_steps) * 100))
 
                 # Use astream_question for true async streaming
                 async for chunk in self.langchain_service.astream_question(
@@ -417,11 +421,10 @@ class CareerDiscoveryService:
                     language=language,
                 ):
                     bot_response_full += chunk
-                    yield f"data: {json.dumps({'delta': chunk, 'is_complete': False})}\n\n"
+                    yield f"data: {json.dumps({'delta': chunk, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
 
-                
                 # Signal completion
-                yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete})}\n\n"
+                yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
 
         await sync_to_async(session.save)()
 
