@@ -200,6 +200,7 @@ class ModulePricingSerializer(serializers.ModelSerializer):  # type: ignore[type
             "school_name",
             "user",
             "user_email",
+            "label_override",
             "is_active",
             "created_at",
             "updated_at",

@@ -997,11 +997,12 @@ UNIVERSITY SEMESTER/YEAR-WISE SCORES (CRITICAL - DO NOT SKIP):
   * CRITICAL: IF you extract 8 items for a Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; you MUST set `hasSemesterWiseScores` to "Yes". It is almost impossible to have an 8-year Bachelor's degree.
   * IF you extract 6 items for a 3-year Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; set `hasSemesterWiseScores` to "Yes".
 - Extract each semester or year as an object in the `semesters` array with fields `semesterName`, `sgpa`, and `maxSgpa`.
-- Each semester object: {{ "semesterName": "1st Semester", "sgpa": 8.75, "maxSgpa": 10.0 }}. 
-- Use "1st Semester", "2nd Semester", etc. for semesters.
-- Use "1st Year", "2nd Year", etc. for years.
+- Each semester object: {{ "semesterName": "Monsoon 2023", "sgpa": 3.53, "maxSgpa": 4.0 }}. 
+- USE SEMESTER NAMES: Look for and capture term names like "Monsoon", "Autumn", "Spring", "Winter", "Summer", "Fall" along with the year (e.g. "Spring 2024"). 
+- If the transcript uses "1st Semester", "Sem 1", etc., use those.
+- Accuracy for GPA: Extract SGPA, GPA, or Term GPA exactly as found. If the transcript shows "GPA: 3.53", set `sgpa` to 3.53.
 - DO NOT mix semester names with year-wise data. If you have 8 items, they MUST be labeled as Semesters, and `hasSemesterWiseScores` MUST be "Yes".
-- This is MANDATORY. If 8 semesters are in the transcript, the `semesters` array must have 8 entries.
+- This is MANDATORY. If 8 semesters are in the transcript, the `semesters` array must have 8 entries (though the UI may cap the initial display).
 
 JSON STRUCTURE:
 {{

@@ -472,7 +472,7 @@ class DomainDiscoveryService:
         """
         # Ensure we have the latest session and avoid lazy-load issues in new loop
         session_id = session.session_id
-        session = await sync_to_async(DomainSession.objects.get)(session_id=session_id)
+        session = await sync_to_async(DomainSession.objects.select_related('user').get)(session_id=session_id)
         
         # Cache values that trigger DB queries
         # Access Check: Admins and paid users get full access, others capped at 5

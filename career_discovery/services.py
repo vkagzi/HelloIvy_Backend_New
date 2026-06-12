@@ -315,6 +315,10 @@ class CareerDiscoveryService:
 
     async def process_message_stream(self, session: CareerSession, user_message: str):
         """Streaming version of process_message that yields chunks."""
+        # Load session with user pre-fetched to avoid SynchronousOnlyOperation errors
+        session_id = session.session_id
+        session = await sync_to_async(CareerSession.objects.select_related('user').get)(session_id=session_id)
+
         # Get language from settings
         language = 'en'
         if session.user and hasattr(session.user, 'settings') and isinstance(session.user.settings, dict):
