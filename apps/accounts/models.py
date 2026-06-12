@@ -36,9 +36,7 @@ class ModuleName(models.TextChoices):
     # ESSAY_BRAINSTORMER = "essay_brainstormer", "Essay Brainstormer"
     # ESSAY_EVALUATOR = "essay_evaluator", "Essay Evaluator"
     COLLEGE_SELECTOR = "college_selector", "College Selector"
-    # DEGREE_SELECTOR = "degree_selector", "Degree Selector"
-    # INTERVIEW_PREP = "interview_prep", "Interview Prep"
-    # RESUME_BUILDER = "resume_builder", "Resume Builder"
+    RESUME_BUILDER = "resume_builder", "Resume Builder"
     CAREER_DISCOVERY = "career_discovery", "Career & Degree Selection"
     DOMAIN_DISCOVERY = "domain_discovery", "Stream & Subject Selection"
 
@@ -49,9 +47,7 @@ MODULE_META: dict[str, dict[str, str]] = {
     # ModuleName.ESSAY_BRAINSTORMER: {"icon": "brain-circuit", "color": "bg-blue-100 text-blue-700"},
     # ModuleName.ESSAY_EVALUATOR:    {"icon": "list-check",    "color": "bg-indigo-100 text-indigo-700"},
     ModuleName.COLLEGE_SELECTOR:     {"icon": "school",        "color": "bg-green-100 text-green-700"},
-    # ModuleName.DEGREE_SELECTOR:    {"icon": "graduation-cap","color": "bg-teal-100 text-teal-700"},
-    # ModuleName.INTERVIEW_PREP:     {"icon": "videoconference","color": "bg-orange-100 text-orange-700"},
-    # ModuleName.RESUME_BUILDER:     {"icon": "CV",            "color": "bg-pink-100 text-pink-700"},
+    ModuleName.RESUME_BUILDER:       {"icon": "file-invoice",  "color": "bg-pink-100 text-pink-700"},
     ModuleName.CAREER_DISCOVERY:     {"icon": "briefcase",     "color": "bg-purple-100 text-purple-700"},
     ModuleName.DOMAIN_DISCOVERY:     {"icon": "world",         "color": "bg-cyan-100 text-cyan-700"},
 }
@@ -500,11 +496,15 @@ class Coupon(models.Model):
         if not self.is_active:
             return False, "Coupon is inactive."
             
-        now_date = timezone.now().date()
+        now_date = timezone.localtime(timezone.now()).date()
+        logger.info(f"[DEBUG] Coupon {self.code}: Server Date={now_date}, Start={self.date_from}, Duration={self.duration}")
+
         if self.date_from and now_date < self.date_from:
-            return False, "Coupon is not yet valid."
+            return False, f"Coupon is valid from {self.date_from}."
         if self.date_from and self.duration:
-            if now_date > self.date_from + timedelta(days=self.duration):
+            expiry_date = self.date_from + timedelta(days=self.duration)
+            if now_date > expiry_date:
+                logger.warning(f"[DEBUG] Coupon {self.code}: EXPIRED. {now_date} > {expiry_date}")
                 return False, "Coupon has expired."
         if self.is_limited and self.max_users is not None and self.used_count >= self.max_users:
             return False, "Coupon usage limit reached."
