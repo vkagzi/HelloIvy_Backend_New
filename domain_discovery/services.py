@@ -593,6 +593,13 @@ class DomainDiscoveryService:
             bot_response = PRE_FINAL_QUESTION
             question_type = 'general'
 
+        # Calculate current progress values
+        questions_completed = new_step
+        total_steps = session.total_steps if session.total_steps > 0 else self.max_deepdive_questions
+        progress_percentage = min(100, int((questions_completed / total_steps) * 100))
+        if is_complete:
+            progress_percentage = 100
+
         # ── Step 3: Stream and Generate response ──────────
         if not is_complete and not bot_response:
             all_messages = await sync_to_async(self.get_session_messages)(session)
@@ -615,7 +622,7 @@ class DomainDiscoveryService:
                 language=language,
             ):
                 full_bot_response += chunk
-                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False})}\n\n"
+                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False, 'questions_completed': questions_completed, 'progress_percentage': progress_percentage})}\n\n"
             
             bot_response = full_bot_response
 
@@ -626,7 +633,7 @@ class DomainDiscoveryService:
                 save_fields.append('total_steps')
         else:
             # For non-streaming cases (conclusion/greeting), yield the full response in one chunk
-            yield f"data: {json.dumps({'delta': bot_response, 'is_complete': False})}\n\n"
+            yield f"data: {json.dumps({'delta': bot_response, 'is_complete': False, 'questions_completed': questions_completed, 'progress_percentage': progress_percentage})}\n\n"
 
         # Finalize
         await sync_to_async(DomainMessage.objects.create)(
@@ -640,7 +647,7 @@ class DomainDiscoveryService:
 
         await sync_to_async(session.save)(update_fields=save_fields)
         
-        yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete})}\n\n"
+        yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete, 'questions_completed': questions_completed, 'progress_percentage': progress_percentage})}\n\n"
 
     @transaction.atomic
     def process_message(self, session: DomainSession, user_message: str) -> Dict[str, Any]:

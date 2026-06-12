@@ -341,6 +341,85 @@ class CollegeMessageStreamView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def post(self, request, session_id):
+        """
+        Supports streaming responses via POST with content in request body.
+        """
+        try:
+            user = get_user_instance(request.user)
+            if not user:
+                return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+            content = request.data.get('content')
+            if not content:
+                return Response({'error': 'Content is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            session = college_selector_service.get_session_by_id(session_id)
+            if not session or not session.user or session.user.id != user.id:
+                return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            if not session.preferences_completed:
+                return Response(
+                    {'error': 'Please complete preferences before starting conversation'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            def sync_stream():
+                q = queue.Queue()
+
+                def run_async():
+                    import asyncio
+                    try:
+                        async def consume():
+                            try:
+                                async for chunk in college_selector_service.process_message_stream(session, content):
+                                    # Ensure chunk is properly formatted as SSE
+                                    if not chunk.endswith('\n\n'):
+                                        chunk += '\n\n'
+                                    q.put(chunk)
+                            except Exception as e:
+                                import traceback
+                                traceback.print_exc()
+                                error_msg = f"data: {json.dumps({'error': str(e)})}\n\n"
+                                q.put(error_msg)
+                            finally:
+                                q.put(None)
+
+                        # Use asyncio.run for a clean, isolated event loop in this thread
+                        asyncio.run(consume())
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        q.put(f"data: {json.dumps({'error': str(e)})}\n\n")
+                        q.put(None)
+
+                thread = threading.Thread(target=run_async, daemon=True)
+                thread.start()
+
+                while True:
+                    try:
+                        chunk = q.get(timeout=60) # Timeout to prevent infinite wait
+                        if chunk is None:
+                            break
+                        yield chunk
+                    except queue.Empty:
+                        break
+
+                if thread.is_alive():
+                    thread.join(timeout=1)
+
+            response = StreamingHttpResponse(
+                sync_stream(),
+                content_type='text/event-stream'
+            )
+            response['Cache-Control'] = 'no-cache'
+            return response
+        except Exception as e:
+            return Response(
+                {'error': f'Streaming failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class CollegeSelectorMessageHistoryView(APIView):
     """Get message history for a College Selector session"""
