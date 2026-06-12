@@ -1,16 +1,16 @@
 {
   "personalDetails": {
-    "firstName": "Priya",
-    "lastName": "Sharma",
+    "firstName": "Anika",
+    "lastName": "Rajvanshi",
     "email": "",
     "countryCode": "",
     "phoneNumber": "",
-    "dob": "2001-03-14",
+    "dob": "",
     "gender": "",
-    "citizenShip": "",
-    "addressline": "",
-    "city": "Mumbai",
-    "zipcode": "400076",
+    "citizenShip": "Indian",
+    "addressline": "Plot No.2, Rajiv Gandhi Education City, Rai 131029",
+    "city": "Sonepat",
+    "zipcode": "131029",
     "mothersProfession": "",
     "fathersProfession": ""
   },
@@ -18,84 +18,293 @@
     {
       "academicLevel": "College/Undergraduate",
       "gradeLevel": "",
-      "institutionName": "Mumbai Institute of Technology",
-      "city": "Mumbai",
-      "yearOfCompletion": "2023",
-      "overallPercentage": 91.7,
-      "maximumPossibleGPA": 10,
-      "degree": "B.E. (Bachelor of Engineering)",
-      "degreeOther": "",
-      "major": "Computer Engineering",
-      "startYear": "2019",
-      "endYear": "2023",
+      "institutionName": "Ashoka University",
+      "city": "Sonepat",
+      "yearOfCompletion": "",
+      "overallPercentage": 3.88,
+      "maximumPossibleGPA": 4.0,
+      "degree": "B.Sc (Bachelor of Science)",
+      "degreeOther": "B.Sc. (Four-Year Honours) Psychology",
+      "major": "Psychology",
+      "startYear": "2023",
+      "endYear": "",
       "board": "",
       "boardOther": "",
       "subjects": [
-        { "subject": "Engineering Mathematics I", "level": "Not Applicable", "yourTotalScore": 88, "highestTotalScore": 100 },
-        { "subject": "Engineering Mathematics II", "level": "Not Applicable", "yourTotalScore": 85, "highestTotalScore": 100 },
-        { "subject": "Programming Fundamentals", "level": "Not Applicable", "yourTotalScore": 90, "highestTotalScore": 100 },
-        { "subject": "Digital Logic Design", "level": "Not Applicable", "yourTotalScore": 86, "highestTotalScore": 100 },
-        { "subject": "Basic Electronics", "level": "Not Applicable", "yourTotalScore": 82, "highestTotalScore": 100 },
-        { "subject": "Engineering Physics", "level": "Not Applicable", "yourTotalScore": 84, "highestTotalScore": 100 },
-        { "subject": "Programming Lab", "level": "Not Applicable", "yourTotalScore": 47, "highestTotalScore": 50 },
-        { "subject": "Digital Logic Lab", "level": "Not Applicable", "yourTotalScore": 45, "highestTotalScore": 50 },
-        { "subject": "Data Structures & Algorithms", "level": "Not Applicable", "yourTotalScore": 91, "highestTotalScore": 100 },
-        { "subject": "Computer Organization", "level": "Not Applicable", "yourTotalScore": 87, "highestTotalScore": 100 },
-        { "subject": "Database Management Systems", "level": "Not Applicable", "yourTotalScore": 89, "highestTotalScore": 100 },
-        { "subject": "Operating Systems", "level": "Not Applicable", "yourTotalScore": 88, "highestTotalScore": 100 },
-        { "subject": "Discrete Mathematics", "level": "Not Applicable", "yourTotalScore": 86, "highestTotalScore": 100 },
-        { "subject": "Object Oriented Programming", "level": "Not Applicable", "yourTotalScore": 92, "highestTotalScore": 100 },
-        { "subject": "DBMS Lab", "level": "Not Applicable", "yourTotalScore": 48, "highestTotalScore": 50 },
-        { "subject": "OOP Lab", "level": "Not Applicable", "yourTotalScore": 49, "highestTotalScore": 50 },
-        { "subject": "Machine Learning", "level": "Not Applicable", "yourTotalScore": 93, "highestTotalScore": 100 },
-        { "subject": "Computer Networks", "level": "Not Applicable", "yourTotalScore": 87, "highestTotalScore": 100 },
-        { "subject": "Software Engineering", "level": "Not Applicable", "yourTotalScore": 88, "highestTotalScore": 100 },
-        { "subject": "Cloud Computing", "level": "Not Applicable", "yourTotalScore": 90, "highestTotalScore": 100 },
-        { "subject": "Information Security", "level": "Not Applicable", "yourTotalScore": 86, "highestTotalScore": 100 },
-        { "subject": "Artificial Intelligence", "level": "Not Applicable", "yourTotalScore": 94, "highestTotalScore": 100 },
-        { "subject": "ML Lab", "level": "Not Applicable", "yourTotalScore": 49, "highestTotalScore": 50 },
-        { "subject": "Networks Lab", "level": "Not Applicable", "yourTotalScore": 46, "highestTotalScore": 50 },
-        { "subject": "Deep Learning", "level": "Not Applicable", "yourTotalScore": 94, "highestTotalScore": 100 },
-        { "subject": "Distributed Systems", "level": "Not Applicable", "yourTotalScore": 88, "highestTotalScore": 100 },
-        { "subject": "Natural Language Processing", "level": "Not Applicable", "yourTotalScore": 91, "highestTotalScore": 100 },
-        { "subject": "Professional Elective I", "level": "Not Applicable", "yourTotalScore": 89, "highestTotalScore": 100 },
-        { "subject": "Professional Elective II", "level": "Not Applicable", "yourTotalScore": 87, "highestTotalScore": 100 },
-        { "subject": "Entrepreneurship & Innovation", "level": "Not Applicable", "yourTotalScore": 85, "highestTotalScore": 100 },
-        { "subject": "Final Year Project", "level": "Not Applicable", "yourTotalScore": 96, "highestTotalScore": 100 },
-        { "subject": "Industrial Training", "level": "Not Applicable", "yourTotalScore": 49, "highestTotalScore": 50 }
+        {
+          "subject": "Economy, Politics and Society",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Literature and the World",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Principles of Science",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Calculus",
+          "level": "Not Applicable",
+          "yourTotalScore": "B",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Introduction to Critical Thinking",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Great Books",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Multivariable Calculus",
+          "level": "Not Applicable",
+          "yourTotalScore": "D+",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Introduction to Psychology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Statistics and Research Methods I",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Introduction to Biology II: Cell Biology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Environmental Studies",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Multivariable Calculus",
+          "level": "Not Applicable",
+          "yourTotalScore": "P",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Introduction to Neuroscience/ Biological Psychology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Developmental Psychology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Introduction to Biology I: Genetics and Evolution",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Computational Neuroscience",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Statistics and Research Methods II",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Cognitive Psychology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Clinical Psychology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Advanced Neuroscience",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Artificial Intelligence and Machine Learning: Theory and Practice",
+          "level": "Not Applicable",
+          "yourTotalScore": "TC",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Psychology and Social Connection",
+          "level": "Not Applicable",
+          "yourTotalScore": "TC",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Biostatistics and Bioinformatics",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "From Amir Khusrau to Delhi Today: A Rhythmic History of the Urdu Verse",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Wrangle and Visualize Data in R",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Mind and Behaviour",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Social Psychology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Psychoactive Drugs",
+          "level": "Not Applicable",
+          "yourTotalScore": "AU",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Quantitative Cognition in Zebrafish",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Physiology",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Branding and Consumer Behaviour",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Business Applications of Data Science",
+          "level": "Not Applicable",
+          "yourTotalScore": "A-",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Evolutionary Cognition",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "Group Processes and Intergroup Relations",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        },
+        {
+          "subject": "AI, Attention, and Language",
+          "level": "Not Applicable",
+          "yourTotalScore": "A",
+          "highestTotalScore": ""
+        }
       ],
       "terms": [],
-      "hasSemesterWiseScores": "No",
+      "hasSemesterWiseScores": "Yes",
       "semesters": [
-        { "semesterName": "1st Year", "sgpa": 8.92, "maxSgpa": 10 },
-        { "semesterName": "2nd Year", "sgpa": 9.21, "maxSgpa": 10 },
-        { "semesterName": "3rd Year", "sgpa": 9.37, "maxSgpa": 10 },
-        { "semesterName": "4th Year", "sgpa": 9.18, "maxSgpa": 10 }
+        {
+          "semesterName": "Monsoon 2023",
+          "sgpa": 3.53,
+          "maxSgpa": 4.0
+        },
+        {
+          "semesterName": "Spring 2024",
+          "sgpa": 3.46,
+          "maxSgpa": 4.0
+        },
+        {
+          "semesterName": "Monsoon 2024",
+          "sgpa": 3.93,
+          "maxSgpa": 4.0
+        },
+        {
+          "semesterName": "Spring 2025",
+          "sgpa": 3.95,
+          "maxSgpa": 4.0
+        },
+        {
+          "semesterName": "Summer 2025",
+          "sgpa": 0.0,
+          "maxSgpa": 4.0
+        },
+        {
+          "semesterName": "Monsoon 2025",
+          "sgpa": 3.95,
+          "maxSgpa": 4.0
+        },
+        {
+          "semesterName": "Spring 2026",
+          "sgpa": 3.9,
+          "maxSgpa": 4.0
+        }
       ]
     }
   ],
   "courses": [],
   "awards": [
     {
-      "nameOfHonorReceived": "Estimated Overall Rank",
-      "description": "Top 5% (Class Rank: 3 / 68)",
-      "levelOfCompetitiveness": "",
-      "numberOfParticipants": "68",
-      "year": "2023"
+      "nameOfHonorReceived": "Dean’s List",
+      "description": "Awarded in Spring 2025 semester",
+      "levelOfCompetitiveness": "University",
+      "numberOfParticipants": "",
+      "year": "2025"
     },
     {
-      "nameOfHonorReceived": "Best Year GPA",
-      "description": "Year 3 – 9.37 / 10.00",
-      "levelOfCompetitiveness": "",
+      "nameOfHonorReceived": "Dean’s List",
+      "description": "Awarded in Monsoon 2025 semester",
+      "levelOfCompetitiveness": "University",
       "numberOfParticipants": "",
-      "year": "2022"
+      "year": "2025"
     },
     {
-      "nameOfHonorReceived": "Division",
-      "description": "First Class with Distinction",
-      "levelOfCompetitiveness": "",
+      "nameOfHonorReceived": "Dean’s List",
+      "description": "Awarded in Spring 2026 semester",
+      "levelOfCompetitiveness": "University",
       "numberOfParticipants": "",
-      "year": "2023"
+      "year": "2026"
     }
   ],
   "testScores": [],
@@ -104,18 +313,5 @@
   },
   "extraCurricular": [],
   "skills": [],
-  "projects": [
-    {
-      "title": "Final Year Project",
-      "description": "",
-      "startDate": "",
-      "endDate": ""
-    },
-    {
-      "title": "Industrial Training",
-      "description": "",
-      "startDate": "",
-      "endDate": ""
-    }
-  ]
+  "projects": []
 }
