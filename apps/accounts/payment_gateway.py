@@ -92,8 +92,8 @@ class HDFCPaymentGateway(PaymentGateway):
     - HDFC_SANDBOX_MODE: Boolean for sandbox/production mode
     """
 
-    BASE_URL_PROD = "https://smartgateway.hdfc.bank.in"
-    BASE_URL_SANDBOX = "https://smartgateway.hdfcuat.bank.in"
+    BASE_URL_PROD = "https://smartgateway.hdfcbank.com"
+    BASE_URL_SANDBOX = "https://smartgatewayuat.hdfcbank.com"
 
     API_VERSION = "2024-02-01"
 

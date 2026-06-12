@@ -251,32 +251,45 @@ class ModuleChoicesView(APIView):
         def get_price(module_name: str) -> float:
             return get_module_price(module_name, currency=currency)
 
-        modules = [
-            {
+        # Get all global pricing records to check for overrides and active status
+        global_pricings = {
+            mp.module_name: mp 
+            for mp in ModulePricing.objects.filter(school__isnull=True, user__isnull=True)
+        }
+
+        inactive_module_names = {
+            name for name, p in global_pricings.items() if not p.is_active
+        }
+
+        # 1. Filter Static Modules
+        modules = []
+        for m in ModuleName:
+            if m.value in inactive_module_names:
+                continue
+            
+            pricing = global_pricings.get(m.value)
+            label = pricing.label_override if (pricing and pricing.label_override) else m.label
+            
+            modules.append({
                 "value": m.value,
-                "label": m.label,
+                "label": label,
                 "price": get_price(m.value),
                 **MODULE_META.get(m.value, {}),
-            }
-            for m in ModuleName
-        ]
+            })
 
+        # 2. Append Active Custom Modules
         from .models import CustomModule
-        pricing_module_names = set(ModulePricing.objects.filter(
-            school__isnull=True, user__isnull=True, is_active=True
-        ).values_list("module_name", flat=True))
-
-        is_admin = False
-        user = getattr(request, "user", None)
-        if user and user.is_authenticated:
-            role = getattr(user, "role", None)
-            is_admin = role in ("superadmin", "operationadmin")
-
+        active_custom_module_names = {
+            name for name, p in global_pricings.items() if p.is_active
+        }
         for cm in CustomModule.objects.all():
-            if str(cm.value) in pricing_module_names or is_admin:
+            if str(cm.value) in active_custom_module_names:
+                pricing = global_pricings.get(str(cm.value))
+                label = pricing.label_override if (pricing and pricing.label_override) else cm.label
+                
                 modules.append({
                     "value": str(cm.value),
-                    "label": cm.label,
+                    "label": label,
                     "price": get_price(str(cm.value)),
                     "icon": cm.icon,
                     "color": cm.color,
@@ -319,15 +332,24 @@ class MyModulesView(UserDTOView):
         from django.utils import timezone
         from .models import UserModuleSubscription, SchoolModuleSubscription, ModuleName, CustomModule, ModulePricing
 
+        # Get set of all modules that are explicitly marked as INACTIVE at global level
+        inactive_global_modules = set(ModulePricing.objects.filter(
+            school__isnull=True, user__isnull=True, is_active=False
+        ).values_list("module_name", flat=True))
+
         # Superadmin and operationadmin bypass subscription checks
         if self.user_dto.role in (UserRole.SUPERADMIN, UserRole.OPERATIONADMIN):
-            global_prices = {
-                mp.module_name for mp in ModulePricing.objects.filter(
-                    school__isnull=True, user__isnull=True, is_active=True
-                )
-            }
-            all_module_names = [m.value for m in ModuleName] + [
-                cm.value for cm in CustomModule.objects.all() if cm.value in global_prices
+            # Admin sees all modules UNLESS they are explicitly marked as inactive
+            all_module_names = [m.value for m in ModuleName if m.value not in inactive_global_modules]
+            
+            # Custom modules must be explicitly active in pricing to show up
+            active_custom_pricing = set(ModulePricing.objects.filter(
+                school__isnull=True, user__isnull=True, is_active=True
+            ).values_list("module_name", flat=True))
+            
+            all_module_names += [
+                cm.value for cm in CustomModule.objects.all() 
+                if cm.value in active_custom_pricing
             ]
             
             # For admins, give a fake far-future expiry date
@@ -350,6 +372,10 @@ class MyModulesView(UserDTOView):
         module_info: dict[str, dict] = {}
 
         def update_module_info(name, expiry, is_active):
+            # If the module is globally inactive, we skip it entirely
+            if name in inactive_global_modules:
+                return
+
             is_expired = expiry < today
             if name not in module_info:
                 module_info[name] = {

@@ -379,10 +379,15 @@ ALLOWED_LEVELS = [
     "AP",
     "Advanced",
     "Core",
+    "Dual Enrollment",
     "Extended",
+    "Foundation",
+    "Higher (HL)",
     "Higher",
     "Honors",
+    "Standard (SL)",
     "Standard",
+    "Other",
 ]
 
 def normalize_level(level_name: str) -> str:
@@ -405,18 +410,26 @@ def normalize_level(level_name: str) -> str:
         return "A Level"
     if lvl_upper in ["AP", "ADVANCED PLACEMENT"]:
         return "AP"
+    if lvl_upper in ["DUAL ENROLLMENT", "DUAL_ENROLLMENT"]:
+        return "Dual Enrollment"
     if "ADVANCED" in lvl_upper:
         return "Advanced"
     if "CORE" in lvl_upper:
         return "Core"
     if "EXTENDED" in lvl_upper:
         return "Extended"
-    if "HIGHER" in lvl_upper or lvl_upper == "HL":
+    if "HIGHER (HL)" in lvl_upper or lvl_upper == "HIGHER (HL)" or lvl_upper == "HL":
+        return "Higher (HL)"
+    if "HIGHER" in lvl_upper:
         return "Higher"
     if "HONOR" in lvl_upper:
         return "Honors"
-    if "STANDARD" in lvl_upper or lvl_upper == "SL":
+    if "STANDARD (SL)" in lvl_upper or lvl_upper == "STANDARD (SL)" or lvl_upper == "SL":
+        return "Standard (SL)"
+    if "STANDARD" in lvl_upper:
         return "Standard"
+    if lvl_upper == "OTHER":
+        return "Other"
         
     return "Not Applicable"
 
@@ -994,15 +1007,22 @@ UNIVERSITY SEMESTER/YEAR-WISE SCORES (CRITICAL - DO NOT SKIP):
 - SEMESTER COUNT LOGIC:
   * For a standard 4-year Bachelor's degree (B.E., B.Tech, B.A., B.Sc, B.Com), expect 8 Semesters or 4 Years.
   * For a standard 2-year Master's degree, expect 4 Semesters or 2 Years.
-  * CRITICAL: IF you extract 8 items for a Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; you MUST set `hasSemesterWiseScores` to "Yes". It is almost impossible to have an 8-year Bachelor's degree.
+  * CRITICAL: IF you extract 8 items for a Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; you MUST set `hasSemesterWiseScores` to "Yes".
   * IF you extract 6 items for a 3-year Bachelor's degree, it is 100% a SEMESTER-WISE breakdown; set `hasSemesterWiseScores` to "Yes".
-- Extract each semester or year as an object in the `semesters` array with fields `semesterName`, `sgpa`, and `maxSgpa`.
-- Each semester object: {{ "semesterName": "Monsoon 2023", "sgpa": 3.53, "maxSgpa": 4.0 }}. 
+- Extract each semester or year as an object in the `semesters` array with fields `semesterName`, `score`, and `highestTotalScore`.
+- Each semester object: {{ "semesterName": "Monsoon 2023", "score": 3.53, "highestTotalScore": 4.0 }}. 
 - USE SEMESTER NAMES: Look for and capture term names like "Monsoon", "Autumn", "Spring", "Winter", "Summer", "Fall" along with the year (e.g. "Spring 2024"). 
 - If the transcript uses "1st Semester", "Sem 1", etc., use those.
-- Accuracy for GPA: Extract SGPA, GPA, or Term GPA exactly as found. If the transcript shows "GPA: 3.53", set `sgpa` to 3.53.
+- Accuracy for GPA: Extract SGPA, GPA, or Term GPA exactly as found. If the transcript shows "GPA: 3.53", set `score` to 3.53.
 - DO NOT mix semester names with year-wise data. If you have 8 items, they MUST be labeled as Semesters, and `hasSemesterWiseScores` MUST be "Yes".
 - This is MANDATORY. If 8 semesters are in the transcript, the `semesters` array must have 8 entries (though the UI may cap the initial display).
+
+100% ACCURACY FOR DEGREE DETAILS:
+- institutionName: Extract full legal university/college name.
+- degree: Extract exact degree (e.g. "Bachelor of Technology", "Master of Business Administration").
+- major: Extract exact specialization (e.g. "Mechanical Engineering", "Finance").
+- startYear / endYear: Extract exact years of study.
+- overallPercentage / maximumPossibleGPA: Extract the final cumulative score if available.
 
 JSON STRUCTURE:
 {{

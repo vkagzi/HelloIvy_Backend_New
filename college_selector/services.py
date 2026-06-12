@@ -295,7 +295,8 @@ class CollegeSelectorService:
             session.current_phase = 'completed'
             save_fields.extend(['total_steps', 'current_phase'])
             
-            yield f"data: {json.dumps({'delta': bot_response, 'is_complete': False})}\n\n"
+            progress_percentage = 100
+            yield f"data: {json.dumps({'delta': bot_response, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
         else:
             # Generate AI response
             all_messages = await sync_to_async(self.get_session_messages)(session)
@@ -303,6 +304,10 @@ class CollegeSelectorService:
             
             bot_response_full = ""
             token_usage = {}
+
+            # Calculate progress before yielding chunks
+            total_steps = session.total_steps if session.total_steps > 0 else self.max_conversation_questions
+            progress_percentage = min(100, int((new_step / total_steps) * 100))
 
             # Use LangChain astream for non-blocking delivery
             async for chunk in self.langchain_service.astream_question(
@@ -314,7 +319,7 @@ class CollegeSelectorService:
                 language=language,
             ):
                 bot_response_full += chunk
-                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False})}\n\n"
+                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
             
             bot_response = bot_response_full
             
@@ -338,7 +343,8 @@ class CollegeSelectorService:
         if not is_complete:
             await sync_to_async(self.fire_conclusion_check)(session.session_id, new_step, session.user)
             
-        yield f"data: {json.dumps({'delta': '', 'is_complete': True})}\n\n"
+        progress_percentage = 100 if is_complete else progress_percentage
+        yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
 
     def process_message(self, session: CollegeSelectorSession, user_message: str) -> Dict[str, Any]:
         """
