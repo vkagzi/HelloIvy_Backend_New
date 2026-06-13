@@ -343,6 +343,17 @@ class CareerDiscoveryService:
             }
         )
 
+        # Save user message to database
+        await sync_to_async(CareerMessage.objects.create)(
+            session=session,
+            message_id=f"msg_{uuid.uuid4().hex[:8]}",
+            type='user',
+            content=user_message,
+            step_number=current_step,
+            phase=session.get_current_phase(),
+            medium='text'
+        )
+
         # Increment step
         current_step = int(session.current_step)
 
