@@ -155,7 +155,7 @@ class UserPaymentSerializer(serializers.ModelSerializer):  # type: ignore[type-a
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "user_email", "user_first_name", "user_last_name", "created_at", "updated_at"]
+        read_only_fields = ["id", "user_email", "user_first_name", "user_last_name"]
 
 
 class SchoolPaymentSerializer(serializers.ModelSerializer):  # type: ignore[type-arg]
@@ -181,7 +181,7 @@ class SchoolPaymentSerializer(serializers.ModelSerializer):  # type: ignore[type
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "school_name", "created_at", "updated_at"]
+        read_only_fields = ["id", "school_name"]
 
 
 class ModulePricingSerializer(serializers.ModelSerializer):  # type: ignore[type-arg]
