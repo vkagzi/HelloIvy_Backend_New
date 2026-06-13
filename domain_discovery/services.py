@@ -580,18 +580,7 @@ class DomainDiscoveryService:
                 session.metadata = metadata
                 save_fields.append('metadata')
 
-        # ── Pre-final question intercept ─────────────────────────
-        if is_complete and not metadata.get('pre_final_asked'):
-            is_complete = False
-            session.total_steps = new_step + 1
-            metadata['pre_final_asked'] = True
-            session.metadata = metadata
-            if 'total_steps' not in save_fields:
-                save_fields.append('total_steps')
-            if 'metadata' not in save_fields:
-                save_fields.append('metadata')
-            bot_response = PRE_FINAL_QUESTION
-            question_type = 'general'
+        # Pre-final question intercept removed (transitions directly to conclusion)
 
         # Calculate current progress values
         questions_completed = new_step

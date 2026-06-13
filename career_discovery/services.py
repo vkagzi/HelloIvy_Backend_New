@@ -343,6 +343,13 @@ class CareerDiscoveryService:
             }
         )
 
+        # Get current step first to avoid local scope issues
+        current_step = int(session.current_step)
+
+        # Fetch conversation history BEFORE saving the new user message
+        # to prevent duplication in the LLM prompt construction
+        all_messages = await sync_to_async(self.get_session_messages)(session)
+
         # Save user message to database
         await sync_to_async(CareerMessage.objects.create)(
             session=session,
@@ -353,19 +360,6 @@ class CareerDiscoveryService:
             phase=session.get_current_phase(),
             medium='text'
         )
-
-        # Increment step
-        current_step = int(session.current_step)
-
-        # Access Check: Admins and paid users get full access, others capped at 5
-        # from apps.accounts.services import check_module_access
-        # access_info = await sync_to_async(check_module_access)(session.user, "career_discovery")
-        
-        # if access_info["access"] == "trial" and access_info["current_usage"] >= access_info["limit"]:
-        #     # Trial limit reached
-        #     lock_message = "Purchase to continue this module"
-        #     yield f"data: {json.dumps({'delta': lock_message, 'is_complete': True, 'error': 'TRIAL_LIMIT_REACHED'})}\n\n"
-        #     return
 
         new_step = current_step + 1
         session.current_step = new_step
@@ -385,57 +379,42 @@ class CareerDiscoveryService:
         bot_response_full = ""
         is_complete = False
 
-        # ── Pre-final answer handling ────────────────────────────
-        if metadata.get('pre_final_asked') and not metadata.get('pre_final_answered'):
-            metadata['pre_final_answered'] = True
-            session.metadata = metadata
-            is_complete = True
-            bot_response_full = await sync_to_async(self._handle_pre_final_response)(session, user_message)
+        is_complete = new_step >= self.total_steps
+
+        # ── Conclusion handling (no pre-final question) ──────────
+        if is_complete:
+            bot_response_full = CONCLUSION_MSG
             yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True, 'questions_completed': new_step, 'progress_percentage': 100})}\n\n"
         else:
-            is_complete = new_step >= self.total_steps
+            # Actual LLM stream
+            all_messages = await sync_to_async(self.get_session_messages)(session)
+            user_profile = await sync_to_async(get_user_profile_data)(session.user)
+            domain_context = await sync_to_async(self.get_domain_discovery_context)(session)
+            domain_context['domain_choices'] = session.metadata.get('domain_choices', {})
+            token_usage = {}
 
-            if is_complete and not metadata.get('pre_final_asked'):
-                is_complete = False
-                session.total_steps = new_step + 1
-                metadata['pre_final_asked'] = True
-                session.metadata = metadata
-                bot_response_full = PRE_FINAL_QUESTION
-                progress_percentage = min(100, int((new_step / session.total_steps) * 100))
-                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
-            elif is_complete:
-                bot_response_full = CONCLUSION_MSG
-                yield f"data: {json.dumps({'delta': bot_response_full, 'is_complete': True, 'questions_completed': new_step, 'progress_percentage': 100})}\n\n"
-            else:
-                # Actual LLM stream
-                all_messages = await sync_to_async(self.get_session_messages)(session)
-                user_profile = await sync_to_async(get_user_profile_data)(session.user)
-                domain_context = await sync_to_async(self.get_domain_discovery_context)(session)
-                domain_context['domain_choices'] = session.metadata.get('domain_choices', {})
-                token_usage = {}
+            user_name = await sync_to_async(get_user_display_name)(None, session.user, 'there')
 
-                user_name = await sync_to_async(get_user_display_name)(None, session.user, 'there')
+            total_steps = session.total_steps if session.total_steps > 0 else self.total_steps
+            progress_percentage = min(100, int((new_step / total_steps) * 100))
 
-                total_steps = session.total_steps if session.total_steps > 0 else self.total_steps
-                progress_percentage = min(100, int((new_step / total_steps) * 100))
+            # Use astream_question for true async streaming
+            async for chunk in self.langchain_service.astream_question(
+                step=new_step,
+                user_response=user_message,
+                messages=all_messages,
+                user_profile=user_profile,
+                user_name=user_name,
+                domain_context=domain_context,
+                session_notes=session.notes or "",
+                token_usage=token_usage,
+                language=language,
+            ):
+                bot_response_full += chunk
+                yield f"data: {json.dumps({'delta': chunk, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
 
-                # Use astream_question for true async streaming
-                async for chunk in self.langchain_service.astream_question(
-                    step=new_step,
-                    user_response=user_message,
-                    messages=all_messages,
-                    user_profile=user_profile,
-                    user_name=user_name,
-                    domain_context=domain_context,
-                    session_notes=session.notes or "",
-                    token_usage=token_usage,
-                    language=language,
-                ):
-                    bot_response_full += chunk
-                    yield f"data: {json.dumps({'delta': chunk, 'is_complete': False, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
-
-                # Signal completion
-                yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
+            # Signal completion
+            yield f"data: {json.dumps({'delta': '', 'is_complete': is_complete, 'questions_completed': new_step, 'progress_percentage': progress_percentage})}\n\n"
 
         await sync_to_async(session.save)()
 
@@ -498,7 +477,7 @@ class CareerDiscoveryService:
         session.is_active = False
         session.save(update_fields=['is_active'])
 
-    def _handle_pre_final_response(self, session: CareerSession, user_message: str) -> str:
+    def _handle_pre_final_response(self, session: CareerSession, user_message: str, all_messages: List[Dict[str, Any]]) -> str:
         """Handle the user's response to the pre-final question.
 
         If the user asked a question, answer it briefly then append the
@@ -523,7 +502,6 @@ class CareerDiscoveryService:
 
         try:
             # Build conversation history so the LLM has full context to answer
-            all_messages = self.get_session_messages(session)
             user_profile = get_user_profile_data(session.user)
 
             from utils.profile_formatting import format_user_profile_context
